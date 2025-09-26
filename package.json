@@ -2,7 +2,8 @@
   "name": "parking",
   "version": "1.0.0",
   "scripts": {
-    "build": "tailwindcss -i ./src/input.css -o ./css/output.css --watch"
+    "build": "tailwindcss -i ./src/input.css -o ./css/output.css --watch",
+    "build:prod": "tailwindcss -i ./src/input.css -o ./css/output.css --minify"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.14",

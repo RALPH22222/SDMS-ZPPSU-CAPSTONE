@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = 'cosecha_tuyo';
+$dbname = 'zppsu_disciplinary';
 $username = 'root';
 $password = '';
 

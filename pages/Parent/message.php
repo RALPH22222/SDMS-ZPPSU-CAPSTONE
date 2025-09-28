@@ -38,30 +38,96 @@ if (isset($_GET['action'])) {
   $action = $_GET['action'];
   try {
     if ($action === 'list_users') {
-      // List Staff users only (role_id = 5), show unread counts of messages sent to this parent
       $q = trim($_GET['q'] ?? '');
-      // Allow messaging any active user (exclude self)
-      $params = [':me' => $parentId];
-      $where = 'WHERE u.is_active = 1 AND u.id != :me';
-      if ($q !== '') {
-        $where .= ' AND (u.username LIKE :q OR u.email LIKE :q)';
-        $params[':q'] = "%$q%";
-      }
-      $sql = "
-        SELECT u.id, u.username, u.email,
-               COALESCE(SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END), 0) AS unread
-        FROM users u
-        LEFT JOIN messages m
-          ON m.sender_user_id = u.id
-         AND m.recipient_user_id = :me
-        $where
-        GROUP BY u.id, u.username, u.email
-        ORDER BY unread DESC, u.username ASC
-        LIMIT 200
+      
+      // Get parent's children
+      $childrenSql = "
+        SELECT s.id, s.user_id, CONCAT(s.first_name, ' ', s.last_name) as name, 'student' as type
+        FROM students s
+        JOIN parent_student ps ON s.id = ps.student_id
+        WHERE ps.parent_user_id = :parentId
       ";
-      $stmt = $pdo->prepare($sql);
-      $stmt->execute($params);
-      $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+      $childrenStmt = $pdo->prepare($childrenSql);
+      $childrenStmt->execute([':parentId' => $parentId]);
+      $children = $childrenStmt->fetchAll(PDO::FETCH_ASSOC);
+      
+      // Get staff assigned to parent's children's cases
+      $staffSql = "
+        SELECT DISTINCT u.id, u.username, u.email, 'staff' as type,
+               CONCAT(s.first_name, ' ', s.last_name) as name
+        FROM users u
+        JOIN staff s ON s.user_id = u.id
+        JOIN cases c ON c.reported_by_staff_id = s.id
+        JOIN students st ON c.student_id = st.id
+        JOIN parent_student ps ON st.id = ps.student_id
+        WHERE ps.parent_user_id = :parentId
+        AND u.is_active = 1
+      ";
+      $staffStmt = $pdo->prepare($staffSql);
+      $staffStmt->execute([':parentId' => $parentId]);
+      $staffMembers = $staffStmt->fetchAll(PDO::FETCH_ASSOC);
+      
+      // Combine and filter results
+      $allUsers = array_merge($children, $staffMembers);
+      
+      // Filter by search query if provided
+      if ($q !== '') {
+        $filteredUsers = [];
+        $q = strtolower($q);
+        foreach ($allUsers as $user) {
+          if (stripos($user['name'], $q) !== false || 
+              (isset($user['email']) && stripos($user['email'], $q) !== false) ||
+              (isset($user['username']) && stripos($user['username'], $q) !== false)) {
+            $filteredUsers[] = $user;
+          }
+        }
+        $allUsers = $filteredUsers;
+      }
+      
+      // Get unread counts for each user
+      $userIds = array_map(function($user) {
+        return $user['id'];
+      }, $allUsers);
+      
+      $unreadCounts = [];
+      if (!empty($userIds)) {
+        $placeholders = rtrim(str_repeat('?,', count($userIds)), ',');
+        $unreadSql = "
+          SELECT sender_user_id, COUNT(*) as unread
+          FROM messages
+          WHERE recipient_user_id = ?
+          AND sender_user_id IN ($placeholders)
+          AND is_read = 0
+          GROUP BY sender_user_id
+        ";
+        $params = array_merge([$parentId], $userIds);
+        $unreadStmt = $pdo->prepare($unreadSql);
+        $unreadStmt->execute($params);
+        while ($row = $unreadStmt->fetch(PDO::FETCH_ASSOC)) {
+          $unreadCounts[$row['sender_user_id']] = (int)$row['unread'];
+        }
+      }
+      
+      // Format response
+      $users = [];
+      foreach ($allUsers as $user) {
+        $users[] = [
+          'id' => $user['id'],
+          'username' => $user['name'],
+          'email' => $user['email'] ?? '',
+          'type' => $user['type'],
+          'unread' => $unreadCounts[$user['id']] ?? 0
+        ];
+      }
+      
+      // Sort by unread count and then by name
+      usort($users, function($a, $b) {
+        if ($a['unread'] === $b['unread']) {
+          return strcmp($a['username'], $b['username']);
+        }
+        return $b['unread'] - $a['unread'];
+      });
+      
       jsonResponse(['ok' => true, 'users' => $users]);
     }
 
@@ -71,15 +137,35 @@ if (isset($_GET['action'])) {
         jsonResponse(['ok' => false, 'error' => 'Invalid user.'], 400);
       }
 
-      // Ensure the counterpart exists and is active (allow any role)
-      try {
-        $chk = $pdo->prepare('SELECT id FROM users WHERE id = :id AND is_active = 1 LIMIT 1');
-        $chk->execute([':id' => $withId]);
-        if (!$chk->fetchColumn()) {
-          jsonResponse(['ok' => false, 'error' => 'User not found.'], 404);
-        }
-      } catch (Throwable $e) {
-        // best-effort; continue
+      // Check if the parent is allowed to message this user
+      $checkAccess = $pdo->prepare("
+        SELECT 1 FROM (
+          -- Check if it's the parent's child
+          SELECT s.user_id
+          FROM students s
+          JOIN parent_student ps ON s.id = ps.student_id
+          WHERE ps.parent_user_id = :parentId
+          AND s.user_id = :withId
+          
+          UNION
+          
+          -- Check if it's a staff member assigned to the parent's child's case
+          SELECT u.id
+          FROM users u
+          JOIN staff s ON s.user_id = u.id
+          JOIN cases c ON c.reported_by_staff_id = s.id
+          JOIN students st ON c.student_id = st.id
+          JOIN parent_student ps ON st.id = ps.student_id
+          WHERE ps.parent_user_id = :parentId
+          AND u.id = :withId
+          AND u.is_active = 1
+        ) AS valid_contacts
+        LIMIT 1
+      ");
+      
+      $checkAccess->execute([':parentId' => $parentId, ':withId' => $withId]);
+      if (!$checkAccess->fetchColumn()) {
+        jsonResponse(['ok' => false, 'error' => 'You are not allowed to message this user.'], 403);
       }
 
       // Mark messages to parent as read
@@ -120,11 +206,35 @@ if (isset($_GET['action'])) {
         jsonResponse(['ok' => false, 'error' => 'Message cannot be empty.'], 400);
       }
 
-      // Ensure recipient exists and is active (allow any role)
-      $chk = $pdo->prepare('SELECT id FROM users WHERE id = :id AND is_active = 1 LIMIT 1');
-      $chk->execute([':id' => $to]);
-      if (!$chk->fetchColumn()) {
-        jsonResponse(['ok' => false, 'error' => 'Recipient not found.'], 404);
+      // Check if the parent is allowed to message this user
+      $checkAccess = $pdo->prepare("
+        SELECT 1 FROM (
+          -- Check if it's the parent's child
+          SELECT s.user_id
+          FROM students s
+          JOIN parent_student ps ON s.id = ps.student_id
+          WHERE ps.parent_user_id = :parentId
+          AND s.user_id = :to
+          
+          UNION
+          
+          -- Check if it's a staff member assigned to the parent's child's case
+          SELECT u.id
+          FROM users u
+          JOIN staff s ON s.user_id = u.id
+          JOIN cases c ON c.reported_by_staff_id = s.id
+          JOIN students st ON c.student_id = st.id
+          JOIN parent_student ps ON st.id = ps.student_id
+          WHERE ps.parent_user_id = :parentId
+          AND u.id = :to
+          AND u.is_active = 1
+        ) AS valid_contacts
+        LIMIT 1
+      ");
+      
+      $checkAccess->execute([':parentId' => $parentId, ':to' => $to]);
+      if (!$checkAccess->fetchColumn()) {
+        jsonResponse(['ok' => false, 'error' => 'You are not allowed to message this user.'], 403);
       }
 
       $ins = $pdo->prepare('INSERT INTO messages (case_id, sender_user_id, recipient_user_id, subject, body, is_read, created_at) VALUES (NULL, :sender, :recipient, NULL, :body, 0, NOW())');

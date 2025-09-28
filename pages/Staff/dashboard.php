@@ -1,6 +1,5 @@
 <?php
   session_start();
-  // Basic auth guard (adjust based on your auth implementation)
   if (!isset($_SESSION['user_id'])) {
     header('Location: ../Auth/login.php');
     exit;
@@ -17,16 +16,9 @@
     $row = $stf->fetch(PDO::FETCH_ASSOC);
     if ($row && !empty($row['id'])) { $currentStaffId = (int)$row['id']; }
   } catch (Throwable $e) { /* ignore; fallback below */ }
-  // For inserts where we must populate reported_by_staff_id, prefer staff.id else fallback to user_id (legacy)
   $reportedByIdForInsert = $currentStaffId ?: $currentUserId;
-
-  // Helper: sanitize output
   function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
-
-  // Prepare feedback messages
   $flash = [ 'type' => null, 'message' => null ];
-
-  // Handle Report Submission
   if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_report') {
     try {
       $pdo->beginTransaction();
@@ -172,21 +164,29 @@
   include '../../components/staff-head.php';
 ?>
 
-<div class="min-h-screen flex">
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><?php echo $pageTitle; ?></title>
+</head>
+<body class="h-full bg-gray-50">
+<div class="min-h-full flex flex-col md:flex-row">
   <?php include '../../components/staff-sidebar.php'; ?>
 
-  <main class="flex-1 ml-0 md:ml-64">
+  <main class="flex-1 md:ml-64">
     <!-- Top bar -->
-    <div class="h-16 flex items-center justify-between px-4 md:px-8 border-b border-gray-200 bg-white sticky top-0 z-40">
+    <div class="h-16 flex items-center justify-between px-4 md:px-6 lg:px-8 border-b border-gray-200 bg-white sticky top-0 z-40">
       <div class="flex items-center gap-3">
-        <button id="staffSidebarToggle" class="md:hidden text-primary text-xl" aria-label="Toggle Sidebar">
+        <button id="staffSidebarToggle" class="md:hidden text-primary text-xl focus:outline-none" aria-label="Toggle Sidebar">
           <i class="fa-solid fa-bars"></i>
         </button>
-        <h1 class="text-xl md:text-2xl font-semibold">Staff Dashboard</h1>
+        <h1 class="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800">Staff Dashboard</h1>
       </div>
     </div>
 
-    <div class="p-4 md:p-8 space-y-6">
+    <div class="p-3 sm:p-4 md:p-6 space-y-4 md:space-y-6">
       <?php if ($flash['type']): ?>
         <div class="p-4 rounded border <?php echo $flash['type']==='success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'; ?>">
           <?php echo $flash['message']; ?>
@@ -195,49 +195,49 @@
 
       <!-- Metrics -->
       <section>
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div class="p-5 rounded-lg border bg-white">
-            <div class="text-sm text-gray-500">Total Cases Reported</div>
-            <div class="text-3xl font-bold mt-1"><?php echo (int)$metrics['total']; ?></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div class="p-3 sm:p-4 rounded-lg border bg-white shadow-sm hover:shadow transition-shadow">
+            <div class="text-xs sm:text-sm text-gray-500 truncate">Total Cases Reported</div>
+            <div class="text-2xl sm:text-3xl font-bold mt-1 text-gray-800"><?php echo (int)$metrics['total']; ?></div>
           </div>
-          <div class="p-5 rounded-lg border bg-white">
-            <div class="text-sm text-gray-500">Under Review/Investigation</div>
-            <div class="text-3xl font-bold mt-1"><?php echo (int)$metrics['under_review']; ?></div>
+          <div class="p-3 sm:p-4 rounded-lg border bg-white shadow-sm hover:shadow transition-shadow">
+            <div class="text-xs sm:text-sm text-gray-500 truncate">Under Review</div>
+            <div class="text-2xl sm:text-3xl font-bold mt-1 text-blue-600"><?php echo (int)$metrics['under_review']; ?></div>
           </div>
-          <div class="p-5 rounded-lg border bg-white">
-            <div class="text-sm text-gray-500">Appealed</div>
-            <div class="text-3xl font-bold mt-1"><?php echo (int)($metrics['appealed'] ?? 0); ?></div>
+          <div class="p-3 sm:p-4 rounded-lg border bg-white shadow-sm hover:shadow transition-shadow">
+            <div class="text-xs sm:text-sm text-gray-500 truncate">Appealed</div>
+            <div class="text-2xl sm:text-3xl font-bold mt-1 text-purple-600"><?php echo (int)($metrics['appealed'] ?? 0); ?></div>
           </div>
-          <div class="p-5 rounded-lg border bg-white">
-            <div class="text-sm text-gray-500">Resolved</div>
-            <div class="text-3xl font-bold mt-1"><?php echo (int)$metrics['resolved']; ?></div>
+          <div class="p-3 sm:p-4 rounded-lg border bg-white shadow-sm hover:shadow transition-shadow">
+            <div class="text-xs sm:text-sm text-gray-500 truncate">Resolved</div>
+            <div class="text-2xl sm:text-3xl font-bold mt-1 text-green-600"><?php echo (int)$metrics['resolved']; ?></div>
           </div>
-          <div class="p-5 rounded-lg border bg-white">
-            <div class="text-sm text-gray-500">Rejected</div>
-            <div class="text-3xl font-bold mt-1"><?php echo (int)$metrics['rejected']; ?></div>
+          <div class="p-3 sm:p-4 rounded-lg border bg-white shadow-sm hover:shadow transition-shadow">
+            <div class="text-xs sm:text-sm text-gray-500 truncate">Rejected</div>
+            <div class="text-2xl sm:text-3xl font-bold mt-1 text-red-600"><?php echo (int)$metrics['rejected']; ?></div>
           </div>
         </div>
       </section>
 
       <!-- Cases by Status (Chart) -->
-      <section class="bg-white border rounded-lg">
-        <div class="flex items-center justify-between p-4 border-b">
-          <h2 class="text-lg font-semibold">Cases by Status</h2>
+      <section class="bg-white border rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between p-3 sm:p-4 border-b">
+          <h2 class="text-base sm:text-lg font-semibold text-gray-800">Cases by Status</h2>
         </div>
-        <div class="p-4">
-          <div class="max-w-xl mx-auto" style="height:220px;">
+        <div class="p-2 sm:p-4">
+          <div class="w-full" style="height:220px;">
             <canvas id="statusChart"></canvas>
           </div>
         </div>
       </section>
 
       <!-- 14-Day Case Trend (Chart) -->
-      <section class="bg-white border rounded-lg">
-        <div class="flex items-center justify-between p-4 border-b">
-          <h2 class="text-lg font-semibold">14-Day Case Trend (by Incident Date)</h2>
+      <section class="bg-white border rounded-lg shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between p-3 sm:p-4 border-b">
+          <h2 class="text-base sm:text-lg font-semibold text-gray-800">14-Day Case Trend</h2>
         </div>
-        <div class="p-4">
-          <div class="max-w-3xl mx-auto" style="height:260px;">
+        <div class="p-2 sm:p-4">
+          <div class="w-full" style="height:260px;">
             <canvas id="trendChart"></canvas>
           </div>
         </div>
@@ -313,4 +313,152 @@
   }
 </script>
 
+  </main>
+</div>
+
+<script>
+  // Chart instances
+  let statusChart = null;
+  let trendChart = null;
+
+  // Charts
+  function initCharts() {
+    // Destroy existing charts if they exist
+    if (statusChart) {
+      statusChart.destroy();
+    }
+    if (trendChart) {
+      trendChart.destroy();
+    }
+
+    // Status Chart (Doughnut)
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx) {
+      statusChart = new Chart(statusCtx.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: <?php echo json_encode($statusChart['labels']); ?>,
+          datasets: [{
+            data: <?php echo json_encode($statusChart['data']); ?>,
+            backgroundColor: ['#3B82F6', '#F59E0B', '#8B5CF6', '#10B981', '#EF4444'],
+            borderWidth: 0,
+            borderColor: '#fff',
+            borderWidth: 2,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: { 
+              position: 'bottom',
+              labels: {
+                padding: 20,
+                usePointStyle: true,
+                pointStyle: 'circle',
+                font: {
+                  size: window.innerWidth < 640 ? 10 : 12
+                }
+              }
+            }
+          },
+          layout: {
+            padding: 10
+          }
+        }
+      });
+    }
+
+    // Trend Chart (Line)
+    const trendCtx = document.getElementById('trendChart');
+    if (trendCtx) {
+      trendChart = new Chart(trendCtx.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: <?php echo json_encode($trendLabels); ?>,
+          datasets: [{
+            label: 'Cases',
+            data: <?php echo json_encode($trendData); ?>,
+            borderColor: '#3B82F6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#3B82F6',
+            pointBorderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { 
+              beginAtZero: true, 
+              precision: 0,
+              grid: {
+                drawBorder: false
+              },
+              ticks: {
+                maxTicksLimit: 5
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                maxRotation: 45,
+                minRotation: 45,
+                autoSkip: true,
+                maxTicksLimit: 7
+              }
+            }
+          },
+          plugins: {
+            legend: { 
+              display: false 
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              titleFont: {
+                size: 12
+              },
+              bodyFont: {
+                size: 13,
+                weight: 'bold'
+              },
+              padding: 10,
+              displayColors: false
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // Initialize charts when the DOM is fully loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    initCharts();
+    
+    // Handle window resize with debounce for charts
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(initCharts, 250);
+    });
+    
+    // Initialize tooltips if any
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  });
+</script>
+
 <?php include '../../components/staff-footer.php'; ?>
+</html>

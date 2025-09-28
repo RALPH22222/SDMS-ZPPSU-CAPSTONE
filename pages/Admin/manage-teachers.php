@@ -1,4 +1,7 @@
 <?php
+  $pageTitle = 'Manage Teachers - SDMS';
+  require_once __DIR__ . '/../../components/admin-head.php';
+  
   // Manage Teachers -> Assign teachers (staff) to classes as advisers
   // Uses tables: classes (id, class_name, adviser_staff_id), staff (id, user_id, names), users (id, role_id), roles (Teacher)
 
@@ -22,17 +25,11 @@
       throw new Exception('Invalid CSRF token.');
     }
   }
-
-  // Use role_id = 6 for teachers
   $teacherRoleId = 5;
-  
-  // Check if any users have role_id = 6
   $checkRole = $pdo->query("SELECT COUNT(*) as count FROM users WHERE role_id = $teacherRoleId")->fetch(PDO::FETCH_ASSOC);
   if ($checkRole['count'] == 0) {
     error_log("WARNING: No users found with role_id = $teacherRoleId. Teachers will not be available for assignment.");
   }
-
-  // Handle POST actions
   try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ensure_csrf();
@@ -62,7 +59,6 @@
       if ($action === 'delete_class') {
         $id = (int)($_POST['class_id'] ?? 0);
         if ($id <= 0) throw new Exception('Invalid class.');
-        // Optional: check dependencies (e.g., students referencing class_id) – not present in schema provided
         $stmt = $pdo->prepare('DELETE FROM classes WHERE id = ?');
         $stmt->execute([$id]);
         $_SESSION['flash'] = flash('success', 'Class deleted.');
@@ -74,7 +70,6 @@
         $classId = (int)($_POST['class_id'] ?? 0);
         $staffId = (int)($_POST['staff_id'] ?? 0);
         if ($classId <= 0 || $staffId <= 0) throw new Exception('Class and Teacher are required.');
-        // Validate staff is a Teacher (by user role)
         $chk = $pdo->prepare('SELECT COUNT(*)
                               FROM staff s
                               JOIN users u ON u.id = s.user_id
@@ -109,11 +104,7 @@
       $flash = flash('error', $e->getMessage());
     }
   }
-
-  // Filters
   $q = trim($_GET['q'] ?? '');
-
-  // Fetch classes with adviser info
   $where = '';
   $params = [];
   if ($q !== '') { $where = 'WHERE c.class_name LIKE ?'; $params[] = "%$q%"; }
@@ -126,8 +117,6 @@
   $stmt = $pdo->prepare($sql);
   $stmt->execute($params);
   $classes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-  // Fetch teachers (staff linked to users with Teacher role)
   $teachers = [];
   if ($teacherRoleId) {
     $tq = $pdo->prepare('SELECT s.id, s.first_name, s.last_name, s.department, u.role_id
@@ -137,11 +126,7 @@
                          ORDER BY s.last_name ASC, s.first_name ASC');
     $tq->execute([$teacherRoleId]);
     $teachers = $tq->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Debug output
     error_log("Teachers with role_id=$teacherRoleId: " . print_r($teachers, true));
-    
-    // Also log all staff with their role_ids for debugging
     $allStaff = $pdo->query('SELECT s.id, s.first_name, s.last_name, u.role_id FROM staff s JOIN users u ON u.id = s.user_id')->fetchAll(PDO::FETCH_ASSOC);
     error_log("All staff with roles: " . print_r($allStaff, true));
   }
@@ -149,15 +134,26 @@
 
 <?php $pageTitle = 'Manage Teachers - SDMS'; include_once __DIR__ . '/../../components/admin-head.php'; ?>
 
-<div class="md:ml-64">
+<div class="min-h-screen">
+  <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+    <div class="h-16 flex items-center px-4">
+      <button id="adminSidebarToggle" class="text-primary text-2xl mr-3">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <h1 class="text-xl font-semibold text-dark">Manage Teachers</h1>
+    </div>
+  </div>
+
   <?php include_once __DIR__ . '/../../components/admin-sidebar.php'; ?>
 
-  <main class="p-6">
+  <main class="md:ml-64 p-4 md:p-6">
     <div class="max-w-7xl mx-auto">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-semibold text-dark">Manage Teachers & Class Advisers</h1>
-        <div class="flex gap-2">
-          <button id="btnOpenCreateClass" class="px-4 py-2 bg-primary text-white rounded hover:opacity-90"><i class="fa fa-plus mr-2"></i>Create Class</button>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <h1 class="text-xl md:text-2xl font-semibold text-dark">Manage Teachers & Class Advisers</h1>
+        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button id="btnOpenCreateClass" class="px-4 py-2 bg-primary text-white rounded hover:opacity-90 w-full sm:w-auto text-center">
+            <i class="fa fa-plus mr-2"></i>Create Class
+          </button>
         </div>
       </div>
 
@@ -166,8 +162,6 @@
              data-type="<?php echo $flash['type']==='success'?'success':'error'; ?>"
              data-msg='<?php echo json_encode($flash["msg"]); ?>'></div>
       <?php endif; ?>
-
-      <!-- Filters -->
       <form method="get" class="bg-white border border-gray-200 rounded-lg p-4 mb-4">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div class="md:col-span-2">
@@ -175,13 +169,16 @@
             <input type="text" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Class name" class="w-full border rounded px-3 py-2" />
           </div>
         </div>
-        <div class="mt-4 flex gap-2">
-          <button class="px-4 py-2 bg-primary text-white rounded hover:opacity-90" type="submit"><i class="fa fa-search mr-2"></i>Filter</button>
-          <a href="<?php echo basename($_SERVER['PHP_SELF']); ?>" class="px-4 py-2 border rounded hover:bg-gray-50"><i class="fa fa-rotate mr-2"></i>Reset</a>
+        <div class="mt-4 flex flex-col sm:flex-row gap-2">
+          <button class="px-4 py-2 bg-primary text-white rounded hover:opacity-90 w-full sm:w-auto text-center" type="submit">
+            <i class="fa fa-search mr-2"></i>Filter
+          </button>
+          <a href="<?php echo basename($_SERVER['PHP_SELF']); ?>" class="px-4 py-2 border rounded hover:bg-gray-50 text-center">
+            <i class="fa fa-rotate mr-2"></i>Reset
+          </a>
         </div>
       </form>
 
-      <!-- Classes Table -->
       <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
           <table class="min-w-full divide-y divide-gray-200">
@@ -205,22 +202,30 @@
                     <div class="text-gray-800"><?php echo htmlspecialchars($adv); ?></div>
                   </td>
                   <td class="px-4 py-3 align-top">
-                    <div class="flex justify-end gap-2">
-                      <button data-id="<?php echo $cid; ?>" data-name="<?php echo htmlspecialchars($c['class_name']); ?>" class="btnRenameClass px-3 py-1.5 border rounded hover:bg-gray-50"><i class="fa fa-pen mr-1"></i>Rename</button>
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <button data-id="<?php echo $cid; ?>" data-name="<?php echo htmlspecialchars($c['class_name']); ?>" class="btnRenameClass px-3 py-1.5 border rounded hover:bg-gray-50 text-sm whitespace-nowrap">
+                        <i class="fa fa-pen mr-1"></i>Rename
+                      </button>
                       <?php if ($c['adviser_staff_id']): ?>
                         <form method="post" class="confirm-unassign">
                           <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf); ?>" />
                           <input type="hidden" name="action" value="unassign_teacher" />
                           <input type="hidden" name="class_id" value="<?php echo $cid; ?>" />
-                          <button class="px-3 py-1.5 border rounded hover:bg-gray-50" type="submit"><i class="fa fa-user-xmark mr-1"></i>Unassign</button>
+                          <button class="px-3 py-1.5 border rounded hover:bg-gray-50 text-sm whitespace-nowrap" type="submit">
+                            <i class="fa fa-user-xmark mr-1"></i>Unassign
+                          </button>
                         </form>
                       <?php endif; ?>
-                      <button data-id="<?php echo $cid; ?>" data-name="<?php echo htmlspecialchars($c['class_name']); ?>" class="btnAssign px-3 py-1.5 bg-primary text-white rounded hover:opacity-90"><i class="fa fa-user-check mr-1"></i>Assign</button>
+                      <button data-id="<?php echo $cid; ?>" data-name="<?php echo htmlspecialchars($c['class_name']); ?>" class="btnAssign px-3 py-1.5 bg-primary text-white rounded hover:opacity-90 text-sm whitespace-nowrap">
+                        <i class="fa fa-user-check mr-1"></i>Assign
+                      </button>
                       <form method="post" class="confirm-delete-class">
                         <input type="hidden" name="csrf" value="<?php echo htmlspecialchars($csrf); ?>" />
                         <input type="hidden" name="action" value="delete_class" />
                         <input type="hidden" name="class_id" value="<?php echo $cid; ?>" />
-                        <button class="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100" type="submit"><i class="fa fa-trash mr-1"></i>Delete</button>
+                        <button class="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 text-sm whitespace-nowrap" type="submit">
+                          <i class="fa fa-trash mr-1"></i>Delete
+                        </button>
                       </form>
                     </div>
                   </td>
@@ -233,10 +238,22 @@
 
     </div>
   </main>
-
 </div>
 
-<!-- Modals -->
+<script>
+  // Toggle sidebar on mobile
+  document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const toggleBtn = document.getElementById('adminSidebarToggle');
+    
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', function() {
+        sidebar.classList.toggle('-translate-x-full');
+        sidebar.classList.toggle('md:translate-x-0');
+      });
+    }
+  });
+</script>
 <div id="modalCreateClass" class="hidden fixed inset-0 z-50 items-center justify-center bg-black/30 p-4">
   <div class="bg-white rounded-lg shadow max-w-md w-full p-6">
     <h3 class="text-lg font-semibold mb-4">Create Class</h3>
@@ -300,7 +317,6 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Flash
     const fd = document.getElementById('flashData');
     if (fd && window.Swal) {
       const type = fd.dataset.type;
@@ -309,8 +325,6 @@
         Swal.fire({ icon: type, title: type === 'success' ? 'Success' : 'Error', text: msg });
       }
     }
-
-    // Modal helpers
     const openModal = (el) => { el.classList.remove('hidden'); el.classList.add('flex'); };
     const closeModal = (el) => { el.classList.add('hidden'); el.classList.remove('flex'); };
 
@@ -341,8 +355,6 @@
         [modalCreate, modalRename, modalAssign].forEach(m => m && closeModal(m));
       });
     });
-
-    // SweetAlert confirmations
     document.querySelectorAll('form.confirm-unassign').forEach((f) => {
       f.addEventListener('submit', (e) => {
         e.preventDefault();

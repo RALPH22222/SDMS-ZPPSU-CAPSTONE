@@ -86,11 +86,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <form method="POST" class="space-y-4">
                         <div>
                             <label for="email" class="block font-semibold mb-1">Email</label>
-                            <input type="email" id="email" name="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="you@example.com" />
+                            <input type="email" id="email" name="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Enter your email" />
                         </div>
                         <div>
                             <label for="password" class="block font-semibold mb-1">Password</label>
-                            <input type="password" id="password" name="password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="••••••••" />
+                            <input type="password" id="password" name="password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Password" />
                         </div>
                         <button type="submit" class="w-full py-3 bg-primary text-white font-semibold rounded-lg shadow hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition">
                             Log In
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </form>
 
                     <p class="mt-6 text-center text-sm">
-                        Don't have an account? <a href="/SDMS/pages/Auth/signup.php" class="text-primary font-semibold">Create a Parent account</a>
+                        Don't have an account? <a href="/SDMS/pages/Auth/signup.php" class="text-primary font-semibold">Create account</a>
                     </p>
                 </div>
             </div>

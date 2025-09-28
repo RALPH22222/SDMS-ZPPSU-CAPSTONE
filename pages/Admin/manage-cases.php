@@ -139,13 +139,24 @@
 
 <?php $pageTitle = 'Manage Cases - SDMS'; include_once __DIR__ . '/../../components/admin-head.php'; ?>
 
-<div class="md:ml-64">
+<div class="min-h-screen md:pl-64">
+  <!-- Mobile header -->
+  <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+    <div class="h-16 flex items-center px-4">
+      <button id="adminSidebarToggle" class="text-primary text-2xl mr-3">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="text-primary font-bold">Manage Cases</div>
+    </div>
+  </div>
+
   <?php include_once __DIR__ . '/../../components/admin-sidebar.php'; ?>
 
-  <main class="p-6">
+  <main class="px-4 md:px-8 py-6">
     <div class="max-w-7xl mx-auto">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-semibold text-dark">Manage Cases</h1>
+      <div class="flex items-center gap-3 mb-6">
+        <i class="fa-solid fa-folder-open text-primary text-2xl"></i>
+        <h1 class="text-2xl md:text-3xl font-bold text-primary">Manage Cases</h1>
       </div>
 
       <?php if ($flash['type']): ?>
@@ -203,7 +214,8 @@
       </form>
 
       <!-- Cases Table -->
-      <div class="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
@@ -291,6 +303,36 @@
     </div>
   </main>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const sidebar = document.getElementById('adminSidebar');
+  const sidebarToggle = document.getElementById('adminSidebarToggle');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  
+  function toggleSidebar() {
+    sidebar.classList.toggle('-translate-x-full');
+    if (sidebarOverlay) {
+      sidebarOverlay.classList.toggle('hidden');
+      document.body.classList.toggle('overflow-hidden');
+    }
+  }
+
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', toggleSidebar);
+  }
+  
+  // Close sidebar when clicking on a nav link on mobile
+  const navLinks = document.querySelectorAll('#adminSidebar a');
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth < 768) { // Only on mobile
+        toggleSidebar();
+      }
+    });
+  });
+});
+</script>
 
 <!-- Resolve Modal -->
 <div id="resolveModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">

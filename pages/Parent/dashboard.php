@@ -28,18 +28,18 @@ try {
 } catch (Throwable $e) {
   $children = [];
 }
-
 // Preload cases per child
 $casesByStudent = [];
 if (!empty($children)) {
   try {
     $caseStmt = $pdo->prepare(
       'SELECT c.id, c.case_number, c.title, c.description, c.incident_date, c.status_id, c.updated_at, c.created_at,
-              cs.name AS status_name, vt.name AS violation_name
+             cs.name AS status_name, vt.name AS violation_name, c.is_confidential
        FROM cases c
        JOIN case_status cs ON cs.id = c.status_id
        JOIN violation_types vt ON vt.id = c.violation_type_id
        WHERE c.student_id = :sid
+       AND (c.is_confidential = 0 OR c.is_confidential IS NULL)
        ORDER BY c.created_at DESC'
     );
 
@@ -87,7 +87,10 @@ include __DIR__ . '/../../components/parent-head.php';
         <?php foreach ($children as $child): ?>
           <?php
             $sid = (int)$child['id'];
-            $cases = $casesByStudent[$sid] ?? [];
+            $filteredCases = array_filter($casesByStudent[$sid] ?? [], function($case) {
+              return !(isset($case['is_confidential']) && $case['is_confidential'] == 1);
+            });
+            $cases = array_values($filteredCases); // Re-index array after filtering
             $total = count($cases);
             $resolved = 0; // status_id = 4
             $rejected = 0; // status_id = 6

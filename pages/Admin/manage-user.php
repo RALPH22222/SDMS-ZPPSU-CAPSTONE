@@ -1,21 +1,11 @@
 <?php
-  // Manage Users Page
-  // Requirements implemented per DB schema:
-  // - Single role per user via users.role_id (NOT NULL)
-  // - Status via users.is_active (0/1)
-  // - Roles management via roles table (unique name)
-  // - Passwords stored using password_hash
-
   session_start();
-  // Simple CSRF token
   if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
   }
   $csrf = $_SESSION['csrf_token'];
 
   require_once __DIR__ . '/../../database/database.php';
-
-  // Seed default roles if none exist
   try {
     $countStmt = $pdo->query('SELECT COUNT(*) FROM roles');
     $roleCount = (int)$countStmt->fetchColumn();
@@ -31,11 +21,9 @@
       foreach ($seed as $r) { $ins->execute([$r[0], $r[1]]); }
     }
   } catch (Exception $e) {
-    // If seeding fails, continue – UI should still load
   }
 
   $flash = ['type' => null, 'msg' => null];
-  // Retrieve flash from session if present (PRG pattern)
   if (!empty($_SESSION['flash']) && is_array($_SESSION['flash'])) {
     $flash = $_SESSION['flash'];
     unset($_SESSION['flash']);
@@ -51,7 +39,6 @@
     }
   }
 
-  // Handle actions
   try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ensure_csrf();
@@ -59,10 +46,7 @@
 
       if ($action === 'create_user') {
         try {
-            // Enable error reporting for PDO
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            
-            // Start transaction
             $pdo->beginTransaction();
             
             $username = trim($_POST['username'] ?? '');
@@ -73,13 +57,10 @@
             $plain = trim($_POST['password'] ?? '');
             
             error_log("Creating user with data: " . print_r($_POST, true));
-            
-            // Validate required fields
+          
             if ($username === '' || $role_id <= 0 || $plain === '') {
                 throw new Exception('Username, Role and Password are required.');
             }
-            
-            // Check if role exists
             $roleCheck = $pdo->prepare('SELECT id, name FROM roles WHERE id = ?');
             $roleCheck->execute([$role_id]);
             $role = $roleCheck->fetch(PDO::FETCH_ASSOC);
@@ -88,8 +69,6 @@
                 throw new Exception('Invalid role selected (ID: ' . $role_id . '). Available roles: ' . 
                     implode(', ', array_map(function($r) { return $r['id'] . ':' . $r['name']; }, $pdo->query('SELECT id, name FROM roles')->fetchAll(PDO::FETCH_ASSOC))));
             }
-            
-            // Check if username already exists
             $userCheck = $pdo->prepare('SELECT id FROM users WHERE username = ?');
             $userCheck->execute([$username]);
             if ($userCheck->fetch()) {
@@ -97,12 +76,8 @@
             }
             
             $hash = password_hash($plain, PASSWORD_DEFAULT);
-            
-            // Get the list of columns in the users table
             $columns = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
             error_log("Users table columns: " . print_r($columns, true));
-            
-            // Prepare the SQL with explicit column names
             $sql = 'INSERT INTO users (username, password_hash, email, contact_number, role_id, is_active, last_login, created_at) ' . 
                    'VALUES (?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP())';
             
@@ -199,7 +174,6 @@
       if ($action === 'delete_role') {
         $id = (int)($_POST['role_id'] ?? 0);
         if ($id <= 0) throw new Exception('Invalid role.');
-        // Check if role is in use
         $cnt = $pdo->prepare('SELECT COUNT(*) FROM users WHERE role_id = ?');
         $cnt->execute([$id]);
         if ((int)$cnt->fetchColumn() > 0) {
@@ -221,16 +195,10 @@
       $flash = flash('error', $e->getMessage());
     }
   }
-
-  // Filters
   $q = trim($_GET['q'] ?? '');
   $filter_role = (int)($_GET['role'] ?? 0);
-  $filter_status = ($_GET['status'] ?? '') !== '' ? (int)$_GET['status'] : null; // 0 or 1
-
-  // Fetch roles for selects
+  $filter_status = ($_GET['status'] ?? '') !== '' ? (int)$_GET['status'] : null;
   $roles = $pdo->query('SELECT id, name, description FROM roles ORDER BY name ASC')->fetchAll(PDO::FETCH_ASSOC);
-
-  // Fetch users list
   $where = [];
   $params = [];
   if ($q !== '') { $where[] = '(u.username LIKE ? OR u.email LIKE ? OR u.contact_number LIKE ?)'; $params[] = "%$q%"; $params[] = "%$q%"; $params[] = "%$q%"; }
@@ -249,15 +217,23 @@
 <?php $pageTitle = 'Manage Users - SDMS'; include_once __DIR__ . '/../../components/admin-head.php'; ?>
 
 <div class="md:ml-64">
+  <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+    <div class="h-16 flex items-center px-4">
+      <button id="adminSidebarToggle" class="text-primary text-2xl mr-3">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="text-primary font-bold">Manage Users</div>
+    </div>
+  </div>
+
   <?php include_once __DIR__ . '/../../components/admin-sidebar.php'; ?>
 
-  <main class="p-6">
+  <main class="px-4 md:px-8 py-6">
     <div class="max-w-7xl mx-auto">
       <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-semibold text-dark">Manage Users</h1>
-        <div class="flex gap-2">
-          <button id="btnOpenCreateUser" class="px-4 py-2 bg-primary text-white rounded hover:opacity-90"><i class="fa fa-plus mr-2"></i>Create User</button>
-          <!-- <button id="btnOpenRoles" class="px-4 py-2 bg-secondary text-black rounded hover:bg-secondary/90 transition-colors"><i class="fa fa-user-shield mr-2"></i>Manage Roles</button> -->
+        <div class="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+          <button id="btnOpenCreateUser" class="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded hover:opacity-90 transition-colors"><i class="fa fa-plus mr-2"></i>Create User</button>
         </div>
       </div>
 
@@ -267,7 +243,7 @@
              data-msg='<?php echo json_encode($flash['msg']); ?>'></div>
       <?php endif; ?>
 
-      <form method="get" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <form method="get" class="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <input type="text" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Search username, email, contact" class="border rounded px-3 py-2 w-full" />
         <select name="role" class="border rounded px-3 py-2 w-full">
           <option value="0">All Roles</option>
@@ -280,20 +256,20 @@
           <option value="1" <?php echo $filter_status===1?'selected':''; ?>>Active</option>
           <option value="0" <?php echo $filter_status===0?'selected':''; ?>>Deactivated</option>
         </select>
-        <button class="px-4 py-2 bg-gray-800 text-white rounded">Filter</button>
+        <button class="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700">Filter</button>
       </form>
 
       <div class="overflow-x-auto bg-white border border-gray-200 rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table class="w-full whitespace-nowrap">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Login</th>
-              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
@@ -314,17 +290,17 @@
                     <?php endif; ?>
                   </td>
                   <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($u['last_login'] ?? ''); ?></td>
-                  <td class="px-4 py-3 text-sm text-right">
-                    <div class="inline-flex gap-2">
-                      <button class="px-2 py-1 text-blue-600 hover:underline" onclick='openEditUser(<?php echo json_encode($u, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>)'>Edit</button>
+                  <td class="px-4 py-3 text-sm">
+                    <div class="flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
+                      <button class="text-blue-600 hover:underline" onclick='openEditUser(<?php echo json_encode($u, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>)'>Edit</button>
                       <form method="post" class="inline confirm-toggle">
                         <input type="hidden" name="csrf" value="<?php echo $csrf; ?>" />
                         <input type="hidden" name="action" value="toggle_user_status" />
                         <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>" />
                         <input type="hidden" name="is_active" value="<?php echo (int)$u['is_active']===1?0:1; ?>" />
-                        <button class="px-2 py-1 text-orange-600 hover:underline"><?php echo (int)$u['is_active']===1?'Deactivate':'Activate'; ?></button>
+                        <button class="text-orange-600 hover:underline"><?php echo (int)$u['is_active']===1?'Deactivate':'Activate'; ?></button>
                       </form>
-                      <button class="px-2 py-1 text-purple-700 hover:underline" onclick="openResetPassword(<?php echo (int)$u['id']; ?>, '<?php echo htmlspecialchars($u['username'], ENT_QUOTES); ?>')">Reset Password</button>
+                      <button class="text-purple-700 hover:underline" onclick="openResetPassword(<?php echo (int)$u['id']; ?>, '<?php echo htmlspecialchars($u['username'], ENT_QUOTES); ?>')">Reset Password</button>
                     </div>
                   </td>
                 </tr>
@@ -333,101 +309,107 @@
           </tbody>
         </table>
       </div>
-
-      <!-- Pagination placeholder -->
       <div class="mt-4 text-sm text-gray-500">Showing <?php echo count($users); ?> result(s).</div>
     </div>
   </main>
 </div>
-
-<!-- Create/Edit User Modal -->
-<div id="userModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-  <div class="bg-white w-full max-w-lg rounded-lg shadow-lg p-6">
+<div id="userModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4 overflow-y-auto">
+  <div class="bg-white w-[95%] max-w-lg rounded-lg shadow-lg p-4 sm:p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 id="userModalTitle" class="text-lg font-semibold">Create User</h2>
-      <button onclick="closeUserModal()" class="text-gray-500 hover:text-gray-700"><i class="fa fa-times"></i></button>
+      <h3 id="userModalTitle" class="text-lg font-semibold"></h3>
+      <button type="button" onclick="closeUserModal()" class="text-gray-400 hover:text-gray-500">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
-    <form method="post" id="userForm">
+    <form method="post" id="userForm" class="space-y-4">
       <input type="hidden" name="csrf" value="<?php echo $csrf; ?>" />
-      <input type="hidden" name="action" value="create_user" />
-      <input type="hidden" name="id" id="userId" value="" />
-
-      <div class="space-y-3">
-        <div>
+      <input type="hidden" name="action" value="" />
+      <input type="hidden" name="id" value="" />
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2">
           <label class="block text-sm font-medium mb-1">Username <span class="text-red-500">*</span></label>
-          <input type="text" name="username" id="username" class="w-full border rounded px-3 py-2" required />
+          <input type="text" name="username" class="w-full border rounded px-3 py-2" required />
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-sm font-medium mb-1">Email</label>
-            <input type="email" name="email" id="email" class="w-full border rounded px-3 py-2" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Contact Number</label>
-            <input type="text" name="contact_number" id="contact_number" class="w-full border rounded px-3 py-2" />
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Email</label>
+          <input type="email" name="email" class="w-full border rounded px-3 py-2" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Contact Number</label>
+          <input type="text" name="contact_number" class="w-full border rounded px-3 py-2" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Role <span class="text-red-500">*</span></label>
+          <select name="role_id" class="w-full border rounded px-3 py-2" required>
+            <option value="">Select Role</option>
+            <?php foreach ($roles as $r): ?>
+              <option value="<?php echo (int)$r['id']; ?>"><?php echo htmlspecialchars($r['name']); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Status</label>
+          <div class="mt-1">
+            <label class="inline-flex items-center">
+              <input type="checkbox" name="is_active" value="1" class="rounded border-gray-300 text-primary focus:ring-primary" checked />
+              <span class="ml-2">Active</span>
+            </label>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-sm font-medium mb-1">Role <span class="text-red-500">*</span></label>
-            <select name="role_id" id="role_id" class="w-full border rounded px-3 py-2" required>
-              <option value="">Select role</option>
-              <?php foreach ($roles as $r): ?>
-                <option value="<?php echo (int)$r['id']; ?>"><?php echo htmlspecialchars($r['name']); ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div class="flex items-center gap-2 mt-6 md:mt-0">
-            <input type="checkbox" name="is_active" id="is_active" class="h-4 w-4" checked />
-            <label for="is_active" class="text-sm">Active</label>
-          </div>
-        </div>
-        <div id="passwordRow">
+        
+        <div id="passwordRow" class="sm:col-span-2">
           <label class="block text-sm font-medium mb-1">Password <span class="text-red-500">*</span></label>
-          <div class="flex">
-            <input type="text" name="password" id="password" class="flex-1 border rounded-l px-3 py-2" required />
-            <button type="button" onclick="genPwd('#password')" class="px-3 py-2 bg-gray-100 border rounded-r hover:bg-gray-200">Generate</button>
+          <div class="flex gap-2">
+            <input type="text" name="password" id="password" class="flex-1 border rounded px-3 py-2" required />
+            <button type="button" onclick="genPwd('#password')" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+              <i class="fa fa-refresh"></i>
+            </button>
           </div>
-          <p class="text-xs text-gray-500 mt-1">Auto-generate generates a strong password and fills the field. It will be hashed in the database.</p>
         </div>
       </div>
-
-      <div class="mt-6 flex justify-end gap-2">
-        <button type="button" onclick="closeUserModal()" class="px-4 py-2 border rounded">Cancel</button>
-        <button class="px-4 py-2 bg-primary text-white rounded">Save</button>
+      
+      <div class="flex justify-end gap-2 mt-6">
+        <button type="button" onclick="closeUserModal()" class="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:opacity-90">Save</button>
       </div>
     </form>
   </div>
 </div>
-
-<!-- Reset Password Modal -->
-<div id="resetModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-  <div class="bg-white w-full max-w-md rounded-lg shadow-lg p-6">
+<div id="resetModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+  <div class="bg-white w-[95%] max-w-md rounded-lg shadow-lg p-4 sm:p-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold">Reset Password</h2>
-      <button onclick="closeReset()" class="text-gray-500 hover:text-gray-700"><i class="fa fa-times"></i></button>
+      <h3 class="text-lg font-semibold">Reset Password</h3>
+      <button type="button" onclick="closeReset()" class="text-gray-400 hover:text-gray-500">
+        <i class="fa fa-times"></i>
+      </button>
     </div>
-    <form method="post" id="resetForm">
+    <form method="post" id="resetForm" class="space-y-4">
       <input type="hidden" name="csrf" value="<?php echo $csrf; ?>" />
       <input type="hidden" name="action" value="reset_password" />
-      <input type="hidden" name="id" id="resetUserId" value="" />
+      <input type="hidden" name="id" id="resetUserId" />
+      
       <div>
-        <label class="block text-sm font-medium mb-1">New Password</label>
-        <div class="flex">
-          <input type="text" name="new_password" id="new_password" class="flex-1 border rounded-l px-3 py-2" required />
-          <button type="button" onclick="genPwd('#new_password')" class="px-3 py-2 bg-gray-100 border rounded-r hover:bg-gray-200">Generate</button>
+        <label class="block text-sm font-medium mb-1">New Password <span class="text-red-500">*</span></label>
+        <div class="flex gap-2">
+          <input type="text" name="new_password" id="new_password" class="flex-1 border rounded px-3 py-2" required />
+          <button type="button" onclick="genPwd('#new_password')" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+            <i class="fa fa-refresh"></i>
+          </button>
         </div>
-        <p class="text-xs text-gray-500 mt-1">Password will be hashed and stored. Copy it now; it won't be shown again.</p>
       </div>
-      <div class="mt-6 flex justify-end gap-2">
-        <button type="button" onclick="closeReset()" class="px-4 py-2 border rounded">Cancel</button>
-        <button class="px-4 py-2 bg-primary text-white rounded">Update</button>
+      
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="closeReset()" class="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:opacity-90">Reset Password</button>
       </div>
     </form>
   </div>
 </div>
-
-<!-- Manage Roles Modal -->
 <div id="rolesModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
   <div class="bg-white w-full max-w-2xl rounded-lg shadow-lg p-6">
     <div class="flex items-center justify-between mb-4">
@@ -453,8 +435,8 @@
       </form>
     </div>
 
-    <div class="overflow-x-auto border border-gray-200 rounded">
-      <table class="min-w-full divide-y divide-gray-200">
+    <div class="overflow-x-auto border border-gray-200 rounded max-h-[60vh]">
+      <table class="w-full whitespace-nowrap">
         <thead class="bg-gray-50">
           <tr>
             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
@@ -483,8 +465,6 @@
         </tbody>
       </table>
     </div>
-
-    <!-- Edit Role Inline Modal -->
     <div id="editRoleWrap" class="mt-4 hidden">
       <form method="post" class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
         <input type="hidden" name="csrf" value="<?php echo $csrf; ?>" />
@@ -507,7 +487,6 @@
 </div>
 
 <script>
-  // Modal controls
   const userModal = document.getElementById('userModal');
   const rolesModal = document.getElementById('rolesModal');
   const resetModal = document.getElementById('resetModal');
@@ -516,7 +495,10 @@
   const passwordRow = document.getElementById('passwordRow');
 
   document.getElementById('btnOpenCreateUser').addEventListener('click', () => openCreateUser());
-  document.getElementById('btnOpenRoles').addEventListener('click', () => openRoles());
+  const rolesBtn = document.getElementById('btnOpenRoles');
+  if (rolesBtn) {
+    rolesBtn.addEventListener('click', () => openRoles());
+  }
 
   function openCreateUser() {
     userModalTitle.textContent = 'Create User';
@@ -583,18 +565,13 @@
     }
     return pwd;
   }
-
-  // SweetAlert integrations
   document.addEventListener('DOMContentLoaded', () => {
-    // Flash notification
     const flash = document.getElementById('flashData');
     if (flash && window.Swal) {
       const type = flash.getAttribute('data-type') || 'info';
       const msg = JSON.parse(flash.getAttribute('data-msg') || '""');
       Swal.fire({ icon: type, title: type === 'success' ? 'Success' : 'Error', text: msg });
     }
-
-    // Confirm toggle user status
     document.querySelectorAll('form.confirm-toggle').forEach((f) => {
       f.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -609,8 +586,6 @@
         }).then((result) => { if (result.isConfirmed) f.submit(); });
       });
     });
-
-    // Confirm delete role
     document.querySelectorAll('form.confirm-delete-role').forEach((f) => {
       f.addEventListener('submit', (e) => {
         e.preventDefault();

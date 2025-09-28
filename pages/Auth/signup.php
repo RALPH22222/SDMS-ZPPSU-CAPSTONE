@@ -172,15 +172,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                         <label class="block font-semibold mb-1">First Name</label>
-                        <input type="text" name="first_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Juan" value="<?php echo htmlspecialchars($first_name ?? ''); ?>" />
+                        <input type="text" name="first_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Name" value="<?php echo htmlspecialchars($first_name ?? ''); ?>" />
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Middle Name (optional)</label>
-                        <input type="text" name="middle_name" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Santos" value="<?php echo htmlspecialchars($middle_name ?? ''); ?>" />
+                        <input type="text" name="middle_name" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Middle Name" value="<?php echo htmlspecialchars($middle_name ?? ''); ?>" />
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Last Name</label>
-                        <input type="text" name="last_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Dela Cruz" value="<?php echo htmlspecialchars($last_name ?? ''); ?>" />
+                        <input type="text" name="last_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Surename" value="<?php echo htmlspecialchars($last_name ?? ''); ?>" />
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Suffix (optional)</label>
@@ -188,11 +188,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div class="md:col-span-2">
                         <label class="block font-semibold mb-1">Email</label>
-                        <input type="email" name="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="parent@example.com" value="<?php echo htmlspecialchars($email ?? ''); ?>" />
+                        <input type="email" name="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Enter Your Email" value="<?php echo htmlspecialchars($email ?? ''); ?>" />
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Contact Number (optional)</label>
-                        <input type="text" name="contact_number" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="09xx xxx xxxx" value="<?php echo htmlspecialchars($contact_number ?? ''); ?>" />
+                        <input type="text" name="contact_number" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Contact Number" value="<?php echo htmlspecialchars($contact_number ?? ''); ?>" />
                     </div>
                     <div></div>
                     <div>
@@ -201,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Confirm Password</label>
-                        <input type="password" name="confirm_password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Repeat your password" />
+                        <input type="password" name="confirm_password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Confirm your password" />
                     </div>
                     <div class="md:col-span-2 pt-2">
                         <h3 class="text-lg font-bold text-primary">Relationship to Student</h3>

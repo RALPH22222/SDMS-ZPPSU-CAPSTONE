@@ -5,6 +5,10 @@ session_start();
 // Require DB and shared head
 require_once __DIR__ . '/../../database/database.php';
 
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Auth guard: only Admin (role_id = 1)
 // if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_id']) || (int)$_SESSION['role_id'] !== 1) {
 //   header('Location: /SDMS/pages/Auth/login.php');
@@ -165,27 +169,29 @@ require_once __DIR__ . '/../../components/admin-head.php';
 ?>
 
 <div class="min-h-screen md:pl-64">
-  <!-- Top bar for mobile with toggle -->
+  <!-- Mobile header with menu toggle -->
   <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
     <div class="h-16 flex items-center px-4">
       <button id="adminSidebarToggle" class="text-primary text-2xl mr-3">
         <i class="fa-solid fa-bars"></i>
       </button>
-      <div class="text-primary font-bold">Messages</div>
+      <h1 class="text-xl font-semibold text-gray-800">Messages</h1>
     </div>
   </div>
-
+  
+  <!-- Desktop Sidebar -->
   <?php include __DIR__ . '/../../components/admin-sidebar.php'; ?>
-
-  <main class="px-4 md:px-8 py-6">
-    <div class="flex items-center gap-3 mb-4">
+  
+  <!-- Main Content -->
+  <main class="px-2 sm:px-4 md:px-6 py-4 sm:py-6">
+    <div class="flex items-center gap-3 mb-6">
       <i class="fa-solid fa-message text-primary text-2xl"></i>
       <h1 class="text-2xl md:text-3xl font-bold text-primary">Messenger</h1>
     </div>
 
-    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm grid grid-cols-1 md:grid-cols-12 min-h-[70vh]">
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm grid grid-cols-1 md:grid-cols-12" style="min-height: calc(100vh - 160px);">
       <!-- Left: user list -->
-      <aside class="md:col-span-4 border-b md:border-b-0 md:border-r border-gray-200">
+      <aside id="userPane" class="md:col-span-4 border-b md:border-b-0 md:border-r border-gray-200">
         <div class="p-3 border-b border-gray-200">
           <div class="relative">
             <input id="searchUsers" type="text" class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Search users by name or email..." />
@@ -198,9 +204,13 @@ require_once __DIR__ . '/../../components/admin-head.php';
       </aside>
 
       <!-- Right: chat area -->
-      <section class="md:col-span-8 flex flex-col">
+      <section id="chatPane" class="md:col-span-8 flex flex-col">
         <!-- Header -->
         <div id="chatHeader" class="p-4 border-b border-gray-200 flex items-center gap-3">
+          <!-- Mobile back button -->
+          <button id="backToListBtn" class="md:hidden mr-2 text-primary text-xl" title="Back to users">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
           <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
             <i class="fa-solid fa-user"></i>
           </div>
@@ -212,8 +222,12 @@ require_once __DIR__ . '/../../components/admin-head.php';
 
         <!-- Messages -->
         <div class="relative flex-1">
-          <div id="chatMessages" class="absolute inset-0 p-4 overflow-y-auto space-y-3 bg-gray-50">
-            <div class="text-center text-gray">No conversation selected.</div>
+          <div id="chatMessages" class="absolute inset-0 p-2 sm:p-3 overflow-y-auto space-y-2 sm:space-y-3 bg-gray-50">
+            <div class="flex flex-col items-center justify-center h-full text-center text-gray-500 py-10">
+              <i class="fas fa-comments text-4xl text-gray-200 mb-4"></i>
+              <p class="text-gray-600">Select a conversation to start messaging</p>
+              <p class="text-sm text-gray-400 mt-2">Or search for a user above</p>
+            </div>
           </div>
           <!-- Scroll to bottom button -->
           <button id="scrollBottomBtn" class="hidden absolute right-4 bottom-4 z-10 px-3 py-2 rounded-full bg-primary text-white shadow hover:opacity-95">
@@ -223,10 +237,14 @@ require_once __DIR__ . '/../../components/admin-head.php';
         </div>
 
         <!-- Composer -->
-        <form id="composer" class="p-3 border-t border-gray-200 flex gap-2">
-          <input id="composerInput" type="text" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Type your message..." disabled />
-          <button id="composerSend" type="submit" class="px-4 py-2 bg-primary text-white rounded-lg disabled:opacity-50" disabled>
-            <i class="fa-solid fa-paper-plane mr-1"></i>Send
+        <form id="composer" class="p-2 sm:p-3 border-t border-gray-200 flex gap-2 bg-white">
+          <input id="composerInput" type="text" 
+            class="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
+            placeholder="Type message..." disabled />
+          <button id="composerSend" type="submit" 
+            class="px-3 sm:px-4 py-2 text-sm sm:text-base bg-primary text-white rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors disabled:opacity-50 flex-shrink-0" 
+            disabled>
+            <i class="fa-solid fa-paper-plane sm:mr-1"></i><span class="hidden sm:inline">Send</span>
           </button>
         </form>
       </section>
@@ -273,6 +291,9 @@ require_once __DIR__ . '/../../components/admin-head.php';
   const composerEl = document.getElementById('composer');
   const composerInputEl = document.getElementById('composerInput');
   const composerSendEl = document.getElementById('composerSend');
+  const userPaneEl = document.getElementById('userPane');
+  const chatPaneEl = document.getElementById('chatPane');
+  const backToListBtn = document.getElementById('backToListBtn');
   // Modal elements
   const editModalEl = document.getElementById('editModal');
   const editMessageInputEl = document.getElementById('editMessageInput');
@@ -392,6 +413,12 @@ require_once __DIR__ . '/../../components/admin-head.php';
     loadThread(userId);
     // Refresh users list immediately so unread styling/badges clear right away
     loadUsers();
+    // On small screens, hide the user list to focus on the chat
+    if (window.innerWidth < 768 && userPaneEl) {
+      userPaneEl.classList.add('hidden');
+      // Ensure we see the chat header
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   async function sendMessage() {
@@ -527,6 +554,21 @@ require_once __DIR__ . '/../../components/admin-head.php';
   // Initial load
   loadUsers();
   startPolling();
+
+  // Back button (mobile): show the user list again
+  if (backToListBtn) {
+    backToListBtn.addEventListener('click', () => {
+      if (userPaneEl) userPaneEl.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // When resizing to desktop, make sure the user list is visible
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 768 && userPaneEl) {
+      userPaneEl.classList.remove('hidden');
+    }
+  });
 </script>
 
 <?php require_once __DIR__ . '/../../components/admin-footer.php'; ?>

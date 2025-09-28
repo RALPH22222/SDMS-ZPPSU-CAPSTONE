@@ -1,6 +1,5 @@
 <?php
   $current = basename($_SERVER['PHP_SELF']);
-  // Helper to check active link
   function studentIsActive($file, $current) {
     return $file === $current ? 'bg-white/10 border-l-4 border-white text-white' : 'text-white/80 hover:text-white';
   }

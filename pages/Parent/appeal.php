@@ -37,11 +37,14 @@
        $ids = array_map(fn($r) => (int)$r['id'], $children);
        $in = implode(',', array_fill(0, count($ids), '?'));
        $sql = "SELECT c.id, c.case_number, c.title, c.student_id, c.status_id, c.incident_date, vt.name AS violation_name,
-                      cs.name AS status_name, c.reported_by_staff_id
+                      cs.name AS status_name, c.reported_by_staff_id, c.is_confidential
                FROM cases c
                JOIN violation_types vt ON vt.id = c.violation_type_id
                JOIN case_status cs ON cs.id = c.status_id
+               LEFT JOIN appeals a ON a.case_id = c.id
                WHERE c.student_id IN ($in)
+               AND (c.is_confidential = 0 OR c.is_confidential IS NULL)
+               AND a.id IS NULL -- Only include cases without an appeal
                ORDER BY c.created_at DESC";
        $st = $pdo->prepare($sql);
        $st->execute($ids);
@@ -79,7 +82,11 @@
          $ids = array_map(fn($r) => (int)$r['id'], $children);
          if (!empty($ids)) {
            $in = implode(',', array_fill(0, count($ids), '?'));
-           $q = $pdo->prepare("SELECT c.*, vt.name AS violation_name FROM cases c JOIN violation_types vt ON vt.id = c.violation_type_id WHERE c.id = ? AND c.student_id IN ($in) LIMIT 1");
+           $q = $pdo->prepare("SELECT c.*, vt.name AS violation_name FROM cases c 
+                               JOIN violation_types vt ON vt.id = c.violation_type_id 
+                               WHERE c.id = ? AND c.student_id IN ($in) 
+                               AND (c.is_confidential = 0 OR c.is_confidential IS NULL) 
+                               LIMIT 1");
            $params = array_merge([$caseId], $ids);
            $q->execute($params);
            $caseRow = $q->fetch(PDO::FETCH_ASSOC) ?: null;

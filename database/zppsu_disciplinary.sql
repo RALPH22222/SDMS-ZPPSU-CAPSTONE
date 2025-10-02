@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 23, 2025 at 11:05 PM
+-- Generation Time: Oct 02, 2025 at 05:59 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -63,7 +63,38 @@ CREATE TABLE `audit_trail` (
 
 INSERT INTO `audit_trail` (`id`, `table_name`, `record_id`, `action`, `performed_by_user_id`, `old_values`, `new_values`, `created_at`) VALUES
 (1, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-23 20:17:40'),
-(2, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-23 20:24:27');
+(2, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-23 20:24:27'),
+(3, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-23 21:14:28'),
+(4, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-23 22:07:47'),
+(5, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-24 04:48:14'),
+(6, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-24 04:48:50'),
+(7, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-24 04:49:19'),
+(8, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-24 04:52:58'),
+(9, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-24 04:59:30'),
+(10, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-24 06:20:42'),
+(11, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-24 06:22:03'),
+(12, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-24 06:22:27'),
+(13, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 03:12:09'),
+(14, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-25 03:13:33'),
+(15, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 04:20:40'),
+(16, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 08:33:48'),
+(17, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-25 09:38:26'),
+(18, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-25 16:41:39'),
+(19, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-25 20:12:16'),
+(20, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 20:16:21'),
+(21, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-25 20:17:13'),
+(22, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-25 20:17:34'),
+(23, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-26 13:55:51'),
+(24, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-26 13:58:17'),
+(25, 'users', '19', 'CREATE', 19, NULL, '{\"username\":\"ralphmonzales665@gmail.com\",\"email\":\"ralphmonzales665@gmail.com\",\"role_id\":4}', '2025-09-27 21:01:54'),
+(26, 'parent_student', '19-2', 'LINK', 19, NULL, '{\"parent_user_id\":19,\"student_id\":2,\"relationship\":\"Mother\"}', '2025-09-27 21:01:54'),
+(27, 'auth', '19', 'LOGOUT', 19, NULL, NULL, '2025-09-27 22:16:24'),
+(28, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-28 06:43:35'),
+(29, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-28 11:58:31'),
+(30, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-28 21:30:04'),
+(31, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-30 13:29:19'),
+(32, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-10-02 00:28:46'),
+(33, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-10-02 00:38:12');
 
 -- --------------------------------------------------------
 
@@ -88,6 +119,13 @@ CREATE TABLE `cases` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `cases`
+--
+
+INSERT INTO `cases` (`id`, `case_number`, `student_id`, `reported_by_staff_id`, `violation_type_id`, `title`, `description`, `location`, `incident_date`, `status_id`, `resolution`, `resolution_date`, `is_confidential`, `created_at`, `updated_at`) VALUES
+(8, 'CASE-20250928-140644-538', 5, 1, 19, 'test', 'test', 'test', '2025-09-27 20:06:00', 4, 'test resolve', '2025-10-02 08:37:56', 0, '2025-09-28 12:06:44', '2025-10-02 00:37:56');
 
 -- --------------------------------------------------------
 
@@ -122,6 +160,13 @@ CREATE TABLE `case_logs` (
   `note` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `case_logs`
+--
+
+INSERT INTO `case_logs` (`id`, `case_id`, `performed_by_user_id`, `action`, `from_value`, `to_value`, `note`, `created_at`) VALUES
+(9, 8, NULL, 'Status Change', '1', '4', 'test resolve', '2025-10-02 00:37:56');
 
 -- --------------------------------------------------------
 
@@ -166,7 +211,8 @@ CREATE TABLE `classes` (
 --
 
 INSERT INTO `classes` (`id`, `class_name`, `adviser_staff_id`, `created_at`) VALUES
-(2, 'BSIT-4A', NULL, '2025-09-23 21:04:53');
+(2, 'BSIT-4A!', 1, '2025-09-23 21:04:53'),
+(3, 'BSIT-4B', 1, '2025-09-23 21:08:34');
 
 -- --------------------------------------------------------
 
@@ -196,7 +242,14 @@ INSERT INTO `messages` (`id`, `case_id`, `sender_user_id`, `recipient_user_id`, 
 (31, NULL, 3, 1, NULL, 'test for double message', 0, '2025-09-23 19:54:46'),
 (32, NULL, 3, 1, NULL, 'test for double message', 0, '2025-09-23 19:54:46'),
 (35, NULL, 3, 1, NULL, 'w', 0, '2025-09-23 19:55:25'),
-(38, NULL, 3, 1, NULL, 'w', 0, '2025-09-23 19:55:25');
+(38, NULL, 3, 1, NULL, 'w', 0, '2025-09-23 19:55:25'),
+(41, NULL, 14, 1, NULL, 'test', 0, '2025-09-23 21:57:25'),
+(43, NULL, 13, 12, NULL, 'edit', 1, '2025-09-25 04:00:36'),
+(52, NULL, 14, 12, NULL, 'test', 1, '2025-09-25 20:17:09'),
+(53, NULL, 14, 18, NULL, 'tezst-edit', 0, '2025-09-26 13:55:28'),
+(54, NULL, 13, 14, NULL, 'tezst', 1, '2025-09-26 15:45:41'),
+(55, NULL, 14, 13, NULL, 'test', 1, '2025-09-26 15:45:58'),
+(56, NULL, 3, 12, NULL, 'test-edit', 0, '2025-09-28 11:54:50');
 
 -- --------------------------------------------------------
 
@@ -213,6 +266,18 @@ CREATE TABLE `notifications` (
   `is_read` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `notifications`
+--
+
+INSERT INTO `notifications` (`id`, `user_id`, `case_id`, `message`, `method_id`, `is_read`, `created_at`) VALUES
+(2, 13, NULL, 'New appeal submitted for case #22', 1, 0, '2025-09-25 09:39:07'),
+(3, 13, NULL, 'New appeal submitted for case #CASE-20250925-035516-829', 1, 0, '2025-09-25 15:10:26'),
+(4, 13, NULL, 'New appeal submitted for case #111', 1, 0, '2025-09-25 15:16:00'),
+(5, 13, NULL, 'New appeal submitted for case #CASE-20250925-221536-119', 1, 0, '2025-09-25 20:16:59'),
+(6, 13, NULL, 'New appeal submitted for case #111', 1, 0, '2025-09-26 13:55:10'),
+(7, 13, NULL, 'New appeal submitted for case #123', 1, 0, '2025-09-26 13:58:40');
 
 -- --------------------------------------------------------
 
@@ -267,7 +332,8 @@ INSERT INTO `roles` (`id`, `name`, `description`, `created_at`) VALUES
 (1, 'Admin', NULL, '2025-09-23 17:16:31'),
 (3, 'Student', NULL, '2025-09-23 17:17:11'),
 (4, 'Parent', NULL, '2025-09-23 17:17:11'),
-(5, 'Teacher', 'Teacher role', '2025-09-23 18:24:42');
+(5, 'Staff', '', '2025-09-23 18:24:42'),
+(6, 'Teacher', 'Teacher role', '2025-09-24 04:50:04');
 
 -- --------------------------------------------------------
 
@@ -289,6 +355,13 @@ CREATE TABLE `staff` (
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `staff`
+--
+
+INSERT INTO `staff` (`id`, `staff_number`, `user_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `department`, `position`, `created_at`, `updated_at`) VALUES
+(1, 'ZPPSU-TCH-2024', 13, 'Maria', 'Reyes', 'Santos', NULL, 'College of Information Technology', 'Faculty Adviser', '2025-09-23 21:08:34', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -309,6 +382,13 @@ CREATE TABLE `students` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `students`
+--
+
+INSERT INTO `students` (`id`, `student_number`, `user_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `birthdate`, `address`, `class_id`, `created_at`, `updated_at`) VALUES
+(5, '123', 12, 'Test', 't', 'Test', 'jr', '2015-09-15', 'Test', 2, '2025-09-28 06:27:11', '2025-09-28 07:05:32');
 
 -- --------------------------------------------------------
 
@@ -335,9 +415,15 @@ CREATE TABLE `users` (
 
 INSERT INTO `users` (`id`, `username`, `password_hash`, `email`, `contact_number`, `role_id`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
 (1, 'Test', '$2y$10$KDeJl4LSpb6fv8LMkzZujeaVvB..OtB53kt6LLeZUXHXnyUvW8loW', 'test@test.com', '09774531022', 5, 1, NULL, '2025-09-23 17:36:58', '2025-09-23 19:20:56'),
-(3, 'testadmin', '$2y$10$6uyDfH0zMSZQ8T/aZ.TnW.x7TfNXwtcUmDGeEMtY8IaEJNJXl9ac.', 'test@admin.com', NULL, 1, 1, '2025-09-24 04:23:57', '2025-09-23 19:46:07', '2025-09-23 20:23:57'),
+(3, 'testadmin', '$2y$10$6uyDfH0zMSZQ8T/aZ.TnW.x7TfNXwtcUmDGeEMtY8IaEJNJXl9ac.', 'test@admin.com', NULL, 1, 1, '2025-10-02 08:37:34', '2025-09-23 19:46:07', '2025-10-02 00:37:34'),
 (4, 'testparent', '$2y$19$OTMhmtTGBKai/BxftM2APO.SvDzkeg9LFbtX3DwlYn/8iwlH9aFZm', 'test@parent.com', NULL, 4, 1, '2025-09-24 04:40:39', '2025-09-23 20:38:52', '2025-09-23 20:40:39'),
-(5, 'teststudent', '$2y$19$OTMhmtTGBKai/BxftM2APO.SvDzkeg9LFbtX3DwlYn/8iwlH9aFZm', 'test@student.com', NULL, 3, 1, NULL, '2025-09-23 20:38:52', NULL);
+(5, 'teststudent', '$2y$19$OTMhmtTGBKai/BxftM2APO.SvDzkeg9LFbtX3DwlYn/8iwlH9aFZm', 'test@student.com', NULL, 3, 1, NULL, '2025-09-23 20:38:52', NULL),
+(12, 'juan.delacruz', '$2y$10$EMRf4YGV9rLVNUCo381t4uVG.QCxzhP7rGgJz.m7qSEC4HAm.vwRO', 'juan.delacruz@student.zppsu.edu.ph', '09123456789', 3, 1, '2025-09-26 04:17:22', '2025-09-23 21:08:34', '2025-09-25 20:17:22'),
+(13, 'maria.santos', '$2y$10$EMRf4YGV9rLVNUCo381t4uVG.QCxzhP7rGgJz.m7qSEC4HAm.vwRO', 'maria.santos@zppsu.edu.ph', '09198765432', 5, 1, '2025-10-02 08:27:59', '2025-09-23 21:08:34', '2025-10-02 00:27:59'),
+(14, 'roberto.delacruz', '$2y$10$EMRf4YGV9rLVNUCo381t4uVG.QCxzhP7rGgJz.m7qSEC4HAm.vwRO', 'roberto.delacruz@email.com', '09234567890', 4, 1, '2025-09-26 21:58:29', '2025-09-23 21:08:34', '2025-09-26 13:58:29'),
+(18, 'chex', '$2y$10$KaaWle08BS4/06WUAJwuHenhKDdnXgPOcbVi6an8ov9RAA.73Z4hC', 'ra@gmail.com', '099229702411', 6, 1, NULL, '2025-09-25 19:49:07', NULL),
+(19, 'ralphmonzales665@gmail.com', '$2y$10$Ot1Bg7VhtjtY0cyaQi3KqeD0.q7oJZM1dyRd4NYe8YcZqm/XFmroq', 'ralphmonzales665@gmail.com', '09774531011', 4, 1, '2025-09-28 05:01:54', '2025-09-27 21:01:54', '2025-09-27 21:01:54'),
+(20, 'tes11', '$2y$10$JB1A9AH6nNFmxryfRQzEoeAf.AVcTm01RYGl.P4XAgOtQAIr/ONei', 'test11@parent.com', '099229701111', 4, 1, NULL, '2025-09-28 21:31:47', '2025-10-01 13:49:51');
 
 -- --------------------------------------------------------
 
@@ -767,31 +853,31 @@ ALTER TABLE `violation_types`
 -- AUTO_INCREMENT for table `appeals`
 --
 ALTER TABLE `appeals`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `audit_trail`
 --
 ALTER TABLE `audit_trail`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `cases`
 --
 ALTER TABLE `cases`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `case_evidence`
 --
 ALTER TABLE `case_evidence`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `case_logs`
 --
 ALTER TABLE `case_logs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `case_status`
@@ -803,19 +889,19 @@ ALTER TABLE `case_status`
 -- AUTO_INCREMENT for table `classes`
 --
 ALTER TABLE `classes`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `messages`
 --
 ALTER TABLE `messages`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `notification_method`
@@ -827,31 +913,31 @@ ALTER TABLE `notification_method`
 -- AUTO_INCREMENT for table `parent_student`
 --
 ALTER TABLE `parent_student`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `id` tinyint(3) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` tinyint(3) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `staff`
 --
 ALTER TABLE `staff`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
 
 --
 -- AUTO_INCREMENT for table `violation_categories`

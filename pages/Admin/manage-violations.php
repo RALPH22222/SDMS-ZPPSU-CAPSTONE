@@ -1,7 +1,4 @@
 <?php
-  // Manage Violations Page
-  // Uses tables: violation_categories, violation_types, violation_penalties
-  // Shows penalties per offense (1st-4th) and supports CRUD + PDF export (client-side)
 
   session_start();
   if (empty($_SESSION['csrf_token'])) {
@@ -23,8 +20,6 @@
       throw new Exception('Invalid CSRF token.');
     }
   }
-
-  // Handle POST actions: create_violation, update_violation, delete_violation
   try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ensure_csrf();
@@ -124,15 +119,9 @@
       $flash = flash('error', $e->getMessage());
     }
   }
-
-  // Current tab (category)
   $currentTab = (int)($_GET['tab'] ?? 0);
-
-  // Fetch categories
   $categories = $pdo->query('SELECT id, name, description FROM violation_categories ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
   if ($currentTab === 0 && $categories) { $currentTab = (int)$categories[0]['id']; }
-
-  // Fetch violations grouped by category with penalties
   $violationsByCat = [];
   $stmt = $pdo->query('SELECT vt.id, vt.category_id, vt.code, vt.name, vt.description,
                               MAX(CASE WHEN vp.offense_number = 1 THEN vp.penalty_description END) AS p1,
@@ -167,8 +156,6 @@
              data-type="<?php echo $flash['type']==='success'?'success':'error'; ?>"
              data-msg='<?php echo json_encode($flash['msg']); ?>'></div>
       <?php endif; ?>
-
-      <!-- Tabs: Categories -->
       <div class="border-b border-gray-200 mb-4">
         <nav class="-mb-px flex flex-wrap gap-2" aria-label="Tabs">
           <?php foreach ($categories as $cat): $cid=(int)$cat['id']; $active=$cid===$currentTab; ?>
@@ -178,8 +165,6 @@
           <?php endforeach; ?>
         </nav>
       </div>
-
-      <!-- Tables per category (only show active for simplicity) -->
       <?php foreach ($categories as $cat): $cid=(int)$cat['id']; if ($cid !== $currentTab) continue; ?>
         <div id="categoryPanel_<?php echo $cid; ?>" class="space-y-3">
           <div class="text-sm text-gray-600">Category: <span class="font-medium"><?php echo htmlspecialchars($cat['name']); ?></span> — <?php echo htmlspecialchars($cat['description'] ?? ''); ?></div>
@@ -246,8 +231,6 @@
     </div>
   </main>
 </div>
-
-<!-- Create/Edit Violation Modal -->
 <div id="violationModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
   <div class="bg-white w-full max-w-3xl rounded-lg shadow-lg p-6">
     <div class="flex items-center justify-between mb-4">
@@ -314,7 +297,6 @@
 </div>
 
 <script>
-  // Buttons and modal refs
   const violationModal = document.getElementById('violationModal');
   const violationForm = document.getElementById('violationForm');
   const violationModalTitle = document.getElementById('violationModalTitle');
@@ -398,8 +380,6 @@
       originalDisplay.push(col.style.display);
       col.style.display = 'none';
     });
-
-    // Load libraries if not present
     await ensureScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
     await ensureScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'jspdf');
 
@@ -411,11 +391,9 @@
         useCORS: true
       });
 
-      const pdf = new jsPDF('l', 'pt', 'a4'); // landscape for wide table
+      const pdf = new jsPDF('l', 'pt', 'a4'); 
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-
-      // Fit image width to page with small margin
       const margin = 20;
       const imgWidth = pageWidth - margin * 2;
       const imgHeight = canvas.height * (imgWidth / canvas.width);
@@ -426,8 +404,6 @@
       const title = document.querySelector('nav [href$="?tab=' + id + '"]')?.textContent?.trim() || 'Violations';
       pdf.text('Violations — ' + title, margin, y);
       y += 10;
-
-      // Add image (table) possibly across multiple pages
       let remainingHeight = imgHeight;
       let position = y + 10;
       let srcY = 0;
@@ -453,7 +429,6 @@
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     } finally {
-      // Restore action columns visibility
       actionColumns.forEach((col, index) => {
         col.style.display = originalDisplay[index];
       });

@@ -1,24 +1,10 @@
 <?php
-// Admin Messenger Page
 session_start();
-
-// Require DB and shared head
 require_once __DIR__ . '/../../database/database.php';
-
-// Enable error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-
-// Auth guard: only Admin (role_id = 1)
-// if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_id']) || (int)$_SESSION['role_id'] !== 1) {
-//   header('Location: /SDMS/pages/Auth/login.php');
-//   exit;
-// }
-
-// Ensure we still have a valid adminId even if the guard above is disabled for testing
 $adminId = (int)($_SESSION['user_id'] ?? 0);
 if ($adminId === 0) {
-  // Fallback: try to detect an admin user from DB (role_id = 1)
   try {
     $stmtAdmin = $pdo->query('SELECT id FROM users WHERE role_id = 1 AND is_active = 1 ORDER BY id ASC LIMIT 1');
     $fallbackId = (int)($stmtAdmin->fetchColumn() ?: 0);
@@ -26,19 +12,14 @@ if ($adminId === 0) {
       $adminId = $fallbackId;
     }
   } catch (Throwable $e) {
-    // ignore; will remain 0
   }
 }
-
-// JSON helpers
 function jsonResponse($data, $code = 200) {
   http_response_code($code);
   header('Content-Type: application/json');
   echo json_encode($data);
   exit;
 }
-
-// API Endpoints within this file
 if (isset($_GET['action'])) {
   $action = $_GET['action'];
   try {
@@ -73,12 +54,8 @@ if (isset($_GET['action'])) {
       if ($withId <= 0 || $withId === $adminId) {
         jsonResponse(['ok' => false, 'error' => 'Invalid user.'], 400);
       }
-
-      // Mark messages to admin as read
       $upd = $pdo->prepare('UPDATE messages SET is_read = 1 WHERE sender_user_id = :with AND recipient_user_id = :admin AND is_read = 0');
       $upd->execute([':with' => $withId, ':admin' => $adminId]);
-
-      // Fetch last 200 messages between admin and selected user
       $stmt = $pdo->prepare('
         SELECT m.id, m.sender_user_id, m.recipient_user_id, m.body, m.created_at,
                su.username AS sender_name, ru.username AS recipient_name,
@@ -93,8 +70,6 @@ if (isset($_GET['action'])) {
       ');
       $stmt->execute([':admin' => $adminId, ':with' => $withId]);
       $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-      // Also return basic user info
       $uStmt = $pdo->prepare('SELECT id, username, email FROM users WHERE id = :id LIMIT 1');
       $uStmt->execute([':id' => $withId]);
       $withUser = $uStmt->fetch(PDO::FETCH_ASSOC);
@@ -147,7 +122,6 @@ if (isset($_GET['action'])) {
       if ($id <= 0) {
         jsonResponse(['ok' => false, 'error' => 'Invalid message.'], 400);
       }
-      // Delete anytime, but only by the sender (admin)
       $del = $pdo->prepare('DELETE FROM messages WHERE id = :id AND sender_user_id = :admin');
       $del->execute([':id' => $id, ':admin' => $adminId]);
       if ($del->rowCount() === 0) {
@@ -155,21 +129,16 @@ if (isset($_GET['action'])) {
       }
       jsonResponse(['ok' => true]);
     }
-
-    // Unknown action
     jsonResponse(['ok' => false, 'error' => 'Unknown action.'], 400);
   } catch (Throwable $e) {
     jsonResponse(['ok' => false, 'error' => 'Server error.'], 500);
   }
 }
-
-// Page render
 $pageTitle = 'Messages - Admin - SDMS';
 require_once __DIR__ . '/../../components/admin-head.php';
 ?>
 
 <div class="min-h-screen md:pl-64">
-  <!-- Mobile header with menu toggle -->
   <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
     <div class="h-16 flex items-center px-4">
       <button id="adminSidebarToggle" class="text-primary text-2xl mr-3">
@@ -178,11 +147,7 @@ require_once __DIR__ . '/../../components/admin-head.php';
       <h1 class="text-xl font-semibold text-gray-800">Messages</h1>
     </div>
   </div>
-  
-  <!-- Desktop Sidebar -->
   <?php include __DIR__ . '/../../components/admin-sidebar.php'; ?>
-  
-  <!-- Main Content -->
   <main class="px-2 sm:px-4 md:px-6 py-4 sm:py-6">
     <div class="flex items-center gap-3 mb-6">
       <i class="fa-solid fa-message text-primary text-2xl"></i>
@@ -190,7 +155,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
     </div>
 
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm grid grid-cols-1 md:grid-cols-12" style="min-height: calc(100vh - 160px);">
-      <!-- Left: user list -->
       <aside id="userPane" class="md:col-span-4 border-b md:border-b-0 md:border-r border-gray-200">
         <div class="p-3 border-b border-gray-200">
           <div class="relative">
@@ -202,12 +166,8 @@ require_once __DIR__ . '/../../components/admin-head.php';
           <!-- Users loaded via JS -->
         </ul>
       </aside>
-
-      <!-- Right: chat area -->
       <section id="chatPane" class="md:col-span-8 flex flex-col">
-        <!-- Header -->
         <div id="chatHeader" class="p-4 border-b border-gray-200 flex items-center gap-3">
-          <!-- Mobile back button -->
           <button id="backToListBtn" class="md:hidden mr-2 text-primary text-xl" title="Back to users">
             <i class="fa-solid fa-arrow-left"></i>
           </button>
@@ -219,8 +179,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
             <div id="chatWithEmail" class="text-sm text-gray"></div>
           </div>
         </div>
-
-        <!-- Messages -->
         <div class="relative flex-1">
           <div id="chatMessages" class="absolute inset-0 p-2 sm:p-3 overflow-y-auto space-y-2 sm:space-y-3 bg-gray-50">
             <div class="flex flex-col items-center justify-center h-full text-center text-gray-500 py-10">
@@ -229,14 +187,11 @@ require_once __DIR__ . '/../../components/admin-head.php';
               <p class="text-sm text-gray-400 mt-2">Or search for a user above</p>
             </div>
           </div>
-          <!-- Scroll to bottom button -->
           <button id="scrollBottomBtn" class="hidden absolute right-4 bottom-4 z-10 px-3 py-2 rounded-full bg-primary text-white shadow hover:opacity-95">
             <i class="fa-solid fa-arrow-down mr-1"></i>
             <span class="text-sm">New messages</span>
           </button>
         </div>
-
-        <!-- Composer -->
         <form id="composer" class="p-2 sm:p-3 border-t border-gray-200 flex gap-2 bg-white">
           <input id="composerInput" type="text" 
             class="flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" 
@@ -251,8 +206,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
     </div>
   </main>
 </div>
-
-<!-- Edit Message Modal -->
 <div id="editModal" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/40"></div>
   <div class="absolute inset-0 flex items-center justify-center p-4">
@@ -293,8 +246,7 @@ require_once __DIR__ . '/../../components/admin-head.php';
   const composerSendEl = document.getElementById('composerSend');
   const userPaneEl = document.getElementById('userPane');
   const chatPaneEl = document.getElementById('chatPane');
-  const backToListBtn = document.getElementById('backToListBtn');
-  // Modal elements
+  const backToListBtn = document.getElementById('backToListBtn');// Modal elements
   const editModalEl = document.getElementById('editModal');
   const editMessageInputEl = document.getElementById('editMessageInput');
   const editMessageIdEl = document.getElementById('editMessageId');
@@ -349,7 +301,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
     chatMessagesEl.innerHTML = '';
     if (!messages || messages.length === 0) {
       chatMessagesEl.innerHTML = '<div class="text-center text-gray">No messages yet. Start the conversation.</div>';
-      // keep at bottom state consistent
       requestAnimationFrame(() => scrollToBottom(false));
       return;
     }
@@ -377,10 +328,8 @@ require_once __DIR__ . '/../../components/admin-head.php';
       chatMessagesEl.appendChild(wrap);
     }
     if (wasAtBottom) {
-      // Stick to bottom if user was already at bottom
       requestAnimationFrame(() => scrollToBottom(false));
     } else {
-      // Show the scroll button if new messages arrived while scrolled up
       showScrollButton(true);
     }
   }
@@ -411,12 +360,9 @@ require_once __DIR__ . '/../../components/admin-head.php';
     composerInputEl.disabled = false;
     composerSendEl.disabled = false;
     loadThread(userId);
-    // Refresh users list immediately so unread styling/badges clear right away
     loadUsers();
-    // On small screens, hide the user list to focus on the chat
     if (window.innerWidth < 768 && userPaneEl) {
       userPaneEl.classList.add('hidden');
-      // Ensure we see the chat header
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
@@ -442,10 +388,7 @@ require_once __DIR__ . '/../../components/admin-head.php';
       alert('Send failed.');
     }
   }
-
-  // Scroll helpers
   function isAtBottom(threshold = 24) {
-    // within threshold px from bottom counts as at bottom
     return (chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop - chatMessagesEl.clientHeight) <= threshold;
   }
   function scrollToBottom(smooth = true) {
@@ -458,14 +401,11 @@ require_once __DIR__ . '/../../components/admin-head.php';
     else scrollBottomBtn.classList.add('hidden');
   }
   chatMessagesEl.addEventListener('scroll', () => {
-    // Hide button when near bottom, show when away and there may be new messages
     showScrollButton(!isAtBottom());
   });
   if (scrollBottomBtn) {
     scrollBottomBtn.addEventListener('click', () => scrollToBottom(true));
   }
-
-  // Delegate edit/delete clicks
   chatMessagesEl.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
@@ -538,8 +478,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
       Swal.fire({ icon: 'error', title: 'Edit failed', text: (res && res.error) ? res.error : 'Please try again.' });
     }
   });
-
-  // Use only the submit handler to avoid double-send (click + submit)
   composerEl.addEventListener('submit', (e) => { e.preventDefault(); sendMessage(); });
   searchUsersEl.addEventListener('input', () => { loadUsers(); });
 
@@ -550,20 +488,14 @@ require_once __DIR__ . '/../../components/admin-head.php';
       if (selectedUserId) await loadThread(selectedUserId);
     }, 5000);
   }
-
-  // Initial load
   loadUsers();
   startPolling();
-
-  // Back button (mobile): show the user list again
   if (backToListBtn) {
     backToListBtn.addEventListener('click', () => {
       if (userPaneEl) userPaneEl.classList.remove('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
-
-  // When resizing to desktop, make sure the user list is visible
   window.addEventListener('resize', () => {
     if (window.innerWidth >= 768 && userPaneEl) {
       userPaneEl.classList.remove('hidden');

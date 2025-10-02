@@ -12,25 +12,29 @@
     <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet">
 <body class="bg-white text-dark">
 <header class="bg-white shadow-md fixed w-full top-0 z-50 border-b-2 border-primary">
-    <div class="container mx-auto px-4 py-2 sm:py-4">
-        <div class="flex justify-between items-center">
-            <a href="#home" class="flex items-center space-x-2 sm:space-x-3">
-                <img src="src/images/Logo.png" alt="ZPPSU Logo" class="h-8 sm:h-10 w-auto">
-                <span class="text-primary font-bold text-sm sm:text-lg hidden sm:block">ZPPSU Student Disciplinary Management System</span>
-                <span class="text-primary font-bold text-sm sm:hidden">ZPPSU SDMS</span>
-            </a>
-            <nav class="hidden md:flex items-center space-x-4 lg:space-x-6">
-                <a href="#home" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">Home</a>
-                <a href="#features" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">Features</a>
-                <a href="#about" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">About</a>
-                <a href="#contact" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">Contact</a>
-                <a href="pages/Auth/login.php" class="btn btn-primary py-2 text-sm lg:text-base px-4 lg:px-6">Log In</a>
-            </nav>
-            <button id="mobileMenuButton" class="md:hidden text-primary text-xl">
-                <i class="fas fa-bars"></i>
-            </button>
+    <div class="w-full max-w-full px-4 py-2 sm:py-4">
+        <div class="flex justify-between items-center w-full">
+            <div class="flex-shrink-0">
+                <a href="#home" class="flex items-center space-x-2 sm:space-x-3">
+                    <img src="src/images/Logo.png" alt="ZPPSU Logo" class="h-8 sm:h-10 w-auto">
+                    <span class="text-primary font-bold text-sm sm:text-lg hidden sm:block">ZPPSU Student Disciplinary Management System</span>
+                    <span class="text-primary font-bold text-sm sm:hidden">ZPPSU SDMS</span>
+                </a>
+            </div>
+            <div class="flex-grow"></div>
+            <div class="flex-shrink-0 mr-4">
+                <nav class="hidden md:flex items-center space-x-4 lg:space-x-6">
+                    <a href="#home" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">Home</a>
+                    <a href="#features" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">Features</a>
+                    <a href="#about" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">About</a>
+                    <a href="#contact" class="py-2 text-sm lg:text-base text-dark hover:text-primary font-medium transition-colors">Contact</a>
+                    <a href="pages/Auth/login.php" class="btn btn-primary py-2 text-sm lg:text-base px-4 lg:px-6 hover:bg-primary-dark transition-colors">Log In</a>
+                </nav>
+                <button id="mobileMenuButton" class="md:hidden text-primary text-xl ml-4">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
         </div>
-        <!-- Mobile Menu -->
         <div id="mobileMenu" class="md:hidden hidden absolute top-full left-0 w-full bg-white shadow-lg py-2 px-4 border-t border-gray-200">
             <a href="#home" class="block py-3 text-dark hover:text-primary font-medium transition-colors border-b border-gray-100">Home</a>
             <a href="#features" class="block py-3 text-dark hover:text-primary font-medium transition-colors border-b border-gray-100">Features</a>

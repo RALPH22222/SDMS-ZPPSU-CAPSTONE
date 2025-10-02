@@ -1,10 +1,8 @@
 <?php
-   // Staff: Manage Appeals (view appeals submitted regarding cases)
    if (session_status() === PHP_SESSION_NONE) {
      session_start();
    }
  
-   // Basic auth guard (adjust based on your auth implementation)
    if (!isset($_SESSION['user_id'])) {
      header('Location: ../Auth/login.php');
      exit;
@@ -14,7 +12,6 @@
  
    $currentUserId = (int)$_SESSION['user_id'];
  
-   // Map to staff.id if available (so we can match cases.reported_by_staff_id that may store either)
    $currentStaffId = null;
    try {
      $stf = $pdo->prepare('SELECT id FROM staff WHERE user_id = ? LIMIT 1');
@@ -23,14 +20,11 @@
      if ($row && !empty($row['id'])) { $currentStaffId = (int)$row['id']; }
    } catch (Throwable $e) { /* ignore */ }
  
-   // Helper: sanitize output
    function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
  
-   // Filters (basic)
    $q = trim($_GET['q'] ?? '');
-   $statusFilter = trim($_GET['status'] ?? ''); // 1=pending,2=under review,3=approved,4=rejected (example mapping only)
+   $statusFilter = trim($_GET['status'] ?? ''); 
  
-   // Build base query: show appeals for cases reported by this staff (by staff.id or by user_id for legacy)
    $params = [];
    $where = [];
    $where[] = '(c.reported_by_staff_id = ? OR c.reported_by_staff_id = ?)';
@@ -83,8 +77,6 @@
    } catch (Throwable $e) {
      $appeals = [];
    }
- 
-   // Local mapping for appeal status (no dedicated appeal_status table in schema dump)
    $appealStatuses = [
      1 => 'Submitted',
      2 => 'Under Review',

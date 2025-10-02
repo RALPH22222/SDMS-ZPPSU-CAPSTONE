@@ -42,7 +42,7 @@
         </a>
       </li>
       <li>
-        <hr class="my-2 border-white/20 py-40">
+        <hr class="my-2 border-white/20 ">
       </li>
       <li>
         <a href="../Auth/logout.php" class="flex items-center gap-3 px-4 py-20 text-white/80 hover:text-white">

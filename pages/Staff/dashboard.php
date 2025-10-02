@@ -6,9 +6,7 @@
   }
 
   require_once '../../database/database.php';
-
   $currentUserId = (int)$_SESSION['user_id'];
-  // Map to staff.id if available
   $currentStaffId = null;
   try {
     $stf = $pdo->prepare('SELECT id FROM staff WHERE user_id = ? LIMIT 1');
@@ -33,16 +31,10 @@
       if (!$student_id || !$violation_type_id || !$incident_date || !$title) {
         throw new Exception('Please fill out all required fields.');
       }
-
-      // Generate unique case number
       $case_number = 'CASE-' . date('Ymd-His') . '-' . substr(bin2hex(random_bytes(4)), 0, 8);
-
-      // Insert case
       $stmt = $pdo->prepare('INSERT INTO cases (case_number, student_id, reported_by_staff_id, violation_type_id, title, description, location, incident_date, status_id) VALUES (?,?,?,?,?,?,?,?,1)');
       $stmt->execute([$case_number, $student_id, $reportedByIdForInsert, $violation_type_id, $title, $description, $location, $incident_date]);
       $case_id = (int)$pdo->lastInsertId();
-
-      // Handle evidence upload (optional, single file)
       if (!empty($_FILES['evidence']['name'])) {
         $uploadDir = '../../uploads/case_evidence/';
         if (!is_dir($uploadDir)) {
@@ -92,12 +84,8 @@
       $flash = [ 'type' => 'error', 'message' => 'Failed to send message: ' . e($ex->getMessage()) ];
     }
   }
-
-  // Fetch dropdown data
   $students = $pdo->query('SELECT id, student_number, first_name, last_name FROM students ORDER BY last_name, first_name')->fetchAll(PDO::FETCH_ASSOC);
   $violations = $pdo->query('SELECT id, code, name FROM violation_types ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
-
-  // Fetch metrics for current staff
   $metrics = [ 'total' => 0, 'under_review' => 0, 'resolved' => 0, 'rejected' => 0 ];
   $stmt = $pdo->prepare('SELECT status_id, COUNT(*) as c FROM cases WHERE (reported_by_staff_id = ? OR reported_by_staff_id = ?) GROUP BY status_id');
   $stmt->execute([$currentStaffId, $currentUserId]);
@@ -107,8 +95,6 @@
     if ((int)$row['status_id'] === 4) { $metrics['resolved'] += (int)$row['c']; }
     if ((int)$row['status_id'] === 6) { $metrics['rejected'] += (int)$row['c']; }
   }
-
-  // Fetch recent cases reported by this staff
   $cases = $pdo->prepare('SELECT c.id, c.case_number, c.title, c.incident_date, c.status_id, ct.name as status_name, s.first_name, s.last_name, vt.name as violation_name
                           FROM cases c
                           LEFT JOIN case_status ct ON ct.id = c.status_id
@@ -119,12 +105,7 @@
                           LIMIT 10');
   $cases->execute([$currentStaffId, $currentUserId]);
   $cases = $cases->fetchAll(PDO::FETCH_ASSOC);
-
-  // Recipients for messaging (Admins and Parents)
   $recipients = $pdo->query("SELECT id, username, role_id FROM users WHERE role_id IN (1,4) ORDER BY role_id, username")->fetchAll(PDO::FETCH_ASSOC);
-
-  // Build datasets for charts
-  // Status distribution for current staff (explicit categories including Appealed)
   $statusAgg = $pdo->prepare('SELECT 
       SUM(CASE WHEN status_id = 1 THEN 1 ELSE 0 END) AS filed,
       SUM(CASE WHEN status_id IN (2,3) THEN 1 ELSE 0 END) AS under_review,
@@ -150,7 +131,7 @@
                               GROUP BY DATE(incident_date)
                               ORDER BY d ASC');
   $trendStmt->execute([$currentStaffId, $currentUserId]);
-  $trendRows = $trendStmt->fetchAll(PDO::FETCH_KEY_PAIR); // [date => count]
+  $trendRows = $trendStmt->fetchAll(PDO::FETCH_KEY_PAIR); 
 
   $trendLabels = [];
   $trendData = [];
@@ -452,7 +433,6 @@
       resizeTimer = setTimeout(initCharts, 250);
     });
     
-    // Initialize tooltips if any
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
       return new bootstrap.Tooltip(tooltipTriggerEl);

@@ -1,10 +1,6 @@
 <?php
   $pageTitle = 'Manage Teachers - SDMS';
   require_once __DIR__ . '/../../components/admin-head.php';
-  
-  // Manage Teachers -> Assign teachers (staff) to classes as advisers
-  // Uses tables: classes (id, class_name, adviser_staff_id), staff (id, user_id, names), users (id, role_id), roles (Teacher)
-
   session_start();
   if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -241,7 +237,6 @@
 </div>
 
 <script>
-  // Toggle sidebar on mobile
   document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('admin-sidebar');
     const toggleBtn = document.getElementById('adminSidebarToggle');

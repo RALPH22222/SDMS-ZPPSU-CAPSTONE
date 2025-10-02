@@ -1,16 +1,7 @@
 <?php
-// Admin Notifications Management Page
 session_start();
 
 require_once __DIR__ . '/../../database/database.php';
-
-// Auth guard: only Admin (role_id = 1)
-// if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_id']) || (int)$_SESSION['role_id'] !== 1) {
-//   header('Location: /SDMS/pages/Auth/login.php');
-//   exit;
-// }
-
-// Ensure we have an admin user id (fallback to first admin if session empty)
 $adminId = (int)($_SESSION['user_id'] ?? 0);
 if ($adminId === 0) {
   try {
@@ -99,7 +90,6 @@ if (isset($_GET['action'])) {
     if ($action === 'methods') {
       $stmt = $pdo->query('SELECT id, name FROM notification_method ORDER BY id ASC');
       $methods = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      // Also include unread counts per method
       $cntStmt = $pdo->prepare('SELECT method_id, COUNT(*) AS unread FROM notifications WHERE user_id = :uid AND is_read = 0 GROUP BY method_id');
       $cntStmt->execute([':uid' => $adminId]);
       $counts = [];
@@ -119,14 +109,11 @@ if (isset($_GET['action'])) {
     jsonResponse(['ok' => false, 'error' => 'Server error'], 500);
   }
 }
-
-// Page render
 $pageTitle = 'Notifications - Admin - SDMS';
 require_once __DIR__ . '/../../components/admin-head.php';
 ?>
 
 <div class="min-h-screen md:pl-64">
-  <!-- Top bar for mobile with toggle -->
   <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
     <div class="h-16 flex items-center px-4">
       <button id="adminSidebarToggle" class="text-primary text-2xl mr-3">
@@ -181,8 +168,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
           </div>
         </div>
       </aside>
-
-      <!-- Notification List -->
       <section class="md:col-span-8">
         <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
@@ -190,7 +175,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
             <div class="text-sm text-gray" id="listInfo"></div>
           </div>
           <ul id="notifList" class="divide-y divide-gray-200 max-h-[70vh] overflow-y-auto">
-            <!-- Items injected by JS -->
           </ul>
         </div>
       </section>
@@ -212,8 +196,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
 
   let pollTimer = null;
   let lastSeenIds = new Set();
-
-  // Settings via localStorage
   function loadSettings() {
     try {
       setSoundEl.checked = localStorage.getItem('notif_sound') === '1';
@@ -354,8 +336,6 @@ require_once __DIR__ . '/../../components/admin-head.php';
       else { notifBadgeEl.classList.add('hidden'); }
     }
   }
-
-  // Events
   filterUnreadEl.addEventListener('change', refreshList);
   filterMethodEl.addEventListener('change', async () => { await loadMethods(); await refreshList(); });
   btnMarkAllEl.addEventListener('click', async () => {

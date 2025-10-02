@@ -135,6 +135,26 @@
   $stmt = $pdo->prepare($sql);
   $stmt->execute($params);
   $cases = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  
+  // Debug information
+  error_log("SQL Query: " . $sql);
+  error_log("Query Parameters: " . print_r($params, true));
+  error_log("Number of cases found: " . count($cases));
+  if (count($cases) === 0) {
+    error_log("No cases found. Checking if tables exist...");
+    try {
+      $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+      error_log("Available tables: " . print_r($tables, true));
+      
+      // Check if cases table exists
+      if (in_array('cases', $tables)) {
+        $caseCount = $pdo->query("SELECT COUNT(*) FROM cases")->fetchColumn();
+        error_log("Total cases in database: " . $caseCount);
+      }
+    } catch (PDOException $e) {
+      error_log("Error checking database: " . $e->getMessage());
+    }
+  }
 ?>
 
 <?php $pageTitle = 'Manage Cases - SDMS'; include_once __DIR__ . '/../../components/admin-head.php'; ?>
@@ -163,6 +183,51 @@
         <div class="hidden" id="flashData"
              data-type="<?php echo $flash['type']==='success'?'success':'error'; ?>"
              data-msg='<?php echo json_encode($flash["msg"]); ?>'></div>
+      <?php endif; ?>
+      
+      <?php 
+      // Debug information
+      if (empty($cases)): 
+        $error_info = [];
+        try {
+          $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+          $error_info[] = "<strong>Available tables:</strong> " . (empty($tables) ? 'None' : implode(', ', $tables));
+          
+          if (in_array('cases', $tables)) {
+            $caseCount = $pdo->query("SELECT COUNT(*) FROM cases")->fetchColumn();
+            $error_info[] = "<strong>Total cases in database:</strong> $caseCount";
+          } else {
+            $error_info[] = "<strong>Error:</strong> 'cases' table does not exist in the database.";
+          }
+          
+          // Check required tables
+          $required_tables = ['students', 'violation_types', 'case_status', 'staff'];
+          $missing_tables = array_diff($required_tables, $tables);
+          if (!empty($missing_tables)) {
+            $error_info[] = "<strong>Missing required tables:</strong> " . implode(', ', $missing_tables);
+          }
+          
+        } catch (PDOException $e) {
+          $error_info[] = "<strong>Database Error:</strong> " . $e->getMessage();
+        }
+      ?>
+      <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-yellow-800">No cases found. Here's what we found:</h3>
+            <div class="mt-2 text-sm text-yellow-700">
+              <ul class="list-disc pl-5 space-y-1">
+                <?php foreach ($error_info as $info): ?>
+                  <li><?php echo $info; ?></li>
+                <?php endforeach; ?>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
       <?php endif; ?>
 
       <!-- Filters -->
@@ -261,8 +326,23 @@
                 </td>
                 <td class="px-4 py-3 text-sm text-right">
                   <div class="inline-flex gap-2">
-                    <!-- View details could navigate to a details page (future) -->
-                    <button class="text-blue-600 hover:underline" onclick='openCaseDetails(<?php echo json_encode(["id"=>(int)$c['id']]); ?>)'>View</button>
+                    <!-- View Case Details Button -->
+                    <button class="text-blue-600 hover:underline" onclick='openCaseDetails(<?php echo json_encode([
+                      'id' => (int)$c['id'],
+                      'case_number' => $c['case_number'],
+                      'title' => $c['title'],
+                      'student' => $c['s_ln'] . ', ' . $c['s_fn'],
+                      'student_number' => $c['student_number'],
+                      'violation' => $c['v_name'] . ' (' . $c['v_code'] . ')',
+                      'incident_date' => date('Y-m-d H:i', strtotime($c['incident_date'])),
+                      'location' => $c['location'],
+                      'description' => $c['description'],
+                      'status' => $c['status_name'],
+                      'is_confidential' => (bool)$c['is_confidential'],
+                      'reported_by' => trim(($c['r_ln'] ?? '') . ', ' . ($c['r_fn'] ?? '')) ?: '—',
+                      'resolution' => $c['resolution'],
+                      'resolution_date' => $c['resolution_date'] ? date('Y-m-d H:i', strtotime($c['resolution_date'])) : null
+                    ], JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>)'>View</button>
                     <?php if (!$isResolved): ?>
                       <button class="text-green-700 hover:underline" onclick='openResolveModal(<?php echo json_encode([
                         'id' => (int)$c['id'],
@@ -302,9 +382,252 @@
       </div>
     </div>
   </main>
+  
+  <!-- Case Details Modal -->
+  <div id="caseDetailsModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-hidden="true">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <!-- Background overlay -->
+      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeCaseDetails()"></div>
+      
+      <!-- Modal panel -->
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+              <div class="flex justify-between items-start">
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                  Case Details: <span id="caseNumber"></span>
+                  <span id="caseConfidential" class="ml-2 text-xs px-2 py-0.5 bg-red-50 text-red-600 rounded hidden">Confidential</span>
+                </h3>
+                <button type="button" class="text-gray-400 hover:text-gray-500" onclick="closeCaseDetails()">
+                  <span class="sr-only">Close</span>
+                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="mt-4">
+                <h4 class="text-lg font-medium text-gray-900 mb-2" id="caseTitle"></h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p class="text-gray-500">Student</p>
+                    <p class="font-medium" id="caseStudent"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Student ID</p>
+                    <p class="font-medium" id="caseStudentNumber"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Violation</p>
+                    <p class="font-medium" id="caseViolation"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Incident Date</p>
+                    <p class="font-medium" id="caseIncidentDate"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Location</p>
+                    <p class="font-medium" id="caseLocation"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Status</p>
+                    <p class="font-medium"><span id="caseStatus"></span></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Reported By</p>
+                    <p class="font-medium" id="caseReportedBy"></p>
+                  </div>
+                </div>
+                <div class="mt-4">
+                  <p class="text-gray-500 mb-1">Description</p>
+                  <div class="bg-gray-50 p-3 rounded" id="caseDescription"></div>
+                </div>
+                <div class="mt-4 hidden" id="resolutionSection">
+                  <p class="text-gray-500 mb-1">Resolution</p>
+                  <div class="bg-green-50 p-3 rounded" id="caseResolution"></div>
+                  <p class="text-sm text-gray-500 mt-1">Resolved on: <span id="caseResolutionDate"></span></p>
+                </div>
+              </div>
+              
+              <!-- Case Details Content -->
+              <div class="mt-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p class="text-gray-500">Case Title</p>
+                    <p class="font-medium" id="caseTitle"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Student</p>
+                    <p class="font-medium" id="caseStudent"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Student ID</p>
+                    <p class="font-medium" id="caseStudentNumber"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Violation</p>
+                    <p class="font-medium" id="caseViolation"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Incident Date</p>
+                    <p class="font-medium" id="caseIncidentDate"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Location</p>
+                    <p class="font-medium" id="caseLocation"></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Status</p>
+                    <p class="font-medium"><span id="caseStatus"></span></p>
+                  </div>
+                  <div>
+                    <p class="text-gray-500">Reported By</p>
+                    <p class="font-medium" id="caseReportedBy"></p>
+                  </div>
+                </div>
+                <div class="mt-4">
+                  <p class="text-gray-500 mb-1">Description</p>
+                  <div class="bg-gray-50 p-3 rounded" id="caseDescription"></div>
+                </div>
+                <div class="mt-4 hidden" id="resolutionSection">
+                  <p class="text-gray-500 mb-1">Resolution</p>
+                  <div class="bg-green-50 p-3 rounded" id="caseResolution"></div>
+                  <p class="text-sm text-gray-500 mt-1">Resolved on: <span id="caseResolutionDate"></span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:ml-3 sm:w-auto sm:text-sm" onclick="closeCaseDetails()">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
+// Case Details Modal Functions
+function openCaseDetails(caseData) {
+  console.log('Opening case details:', caseData);
+  const modal = document.getElementById('caseDetailsModal');
+  
+  if (!modal) {
+    console.error('Error: Could not find caseDetailsModal element');
+    alert('Error: Could not load case details. Please try again.');
+    return;
+  }
+  
+  try {
+    // Debug: Log all elements we're trying to set
+    console.log('Setting modal content for case:', caseData.case_number);
+    
+    // Helper function to safely set text content
+    const setTextContent = (id, text) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = text || '—';
+      } else {
+        console.warn(`Element with ID '${id}' not found`);
+      }
+    };
+    
+    // Set all text content
+    setTextContent('caseNumber', caseData.case_number);
+    setTextContent('caseTitle', caseData.title);
+    setTextContent('caseStudent', caseData.student);
+    setTextContent('caseStudentNumber', caseData.student_number);
+    setTextContent('caseViolation', caseData.violation);
+    setTextContent('caseIncidentDate', caseData.incident_date);
+    setTextContent('caseLocation', caseData.location || '—');
+    
+    // Set status with styling
+    const statusElement = document.getElementById('caseStatus');
+    if (statusElement) {
+      statusElement.textContent = caseData.status;
+      statusElement.className = 'inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ' + 
+        (caseData.status && caseData.status.toLowerCase().includes('resolved') 
+          ? 'bg-green-100 text-green-800' 
+          : 'bg-yellow-100 text-yellow-800');
+    }
+    
+    // Set reported by and description
+    setTextContent('caseReportedBy', caseData.reported_by);
+    setTextContent('caseDescription', caseData.description || 'No description provided.');
+    
+    // Handle confidential flag
+    const confidentialElement = document.getElementById('caseConfidential');
+    if (confidentialElement) {
+      confidentialElement.style.display = caseData.is_confidential ? 'inline-block' : 'none';
+    }
+    
+    // Handle resolution
+    const resolutionSection = document.getElementById('resolutionSection');
+    if (resolutionSection) {
+      if (caseData.resolution) {
+        resolutionSection.classList.remove('hidden');
+        setTextContent('caseResolution', caseData.resolution);
+        setTextContent('caseResolutionDate', caseData.resolution_date || '—');
+      } else {
+        resolutionSection.classList.add('hidden');
+      }
+    }
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    modal.classList.add('block');
+    document.body.classList.add('overflow-hidden');
+    
+    // Force a reflow to ensure animations work
+    void modal.offsetWidth;
+    
+    // Add a small delay to ensure the transition works
+    setTimeout(() => {
+      modal.classList.add('opacity-100');
+    }, 10);
+    
+  } catch (error) {
+    console.error('Error in openCaseDetails:', error);
+    alert('An error occurred while loading case details. Please check the console for details.');
+  }
+}
+
+function closeCaseDetails() {
+  const modal = document.getElementById('caseDetailsModal');
+  if (modal) {
+    // Trigger the closing animation
+    modal.classList.remove('opacity-100');
+    
+    // Wait for the animation to complete before hiding
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      modal.classList.remove('block');
+      document.body.classList.remove('overflow-hidden');
+    }, 200); // Match this with your CSS transition duration
+  }
+}
+
+// Initialize modal event listeners when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('caseDetailsModal');
+  if (modal) {
+    // Close when clicking outside the modal content
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeCaseDetails();
+      }
+    });
+    
+    // Close button
+    const closeBtn = modal.querySelector('button[onclick="closeCaseDetails()"]');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeCaseDetails);
+    }
+  }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
   const sidebar = document.getElementById('adminSidebar');
   const sidebarToggle = document.getElementById('adminSidebarToggle');
@@ -387,14 +710,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function show(el) { el.classList.remove('hidden'); el.classList.add('flex'); }
   function hide(el) { el.classList.add('hidden'); el.classList.remove('flex'); }
 
-  // Placeholder for view action (future extension)
-  function openCaseDetails(data) {
-    if (window.Swal) {
-      Swal.fire({ title: 'Case Details', text: 'Detailed view is under construction.', icon: 'info' });
-    } else {
-      alert('Detailed view is under construction.');
-    }
-  }
+  // The openCaseDetails function is already defined above with full modal functionality
 </script>
 
 <?php include_once __DIR__ . '/../../components/admin-footer.php'; ?>

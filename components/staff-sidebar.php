@@ -1,6 +1,6 @@
 <?php
   $current = basename($_SERVER['PHP_SELF']);
-  // Helper to check active link
+    // Helper to check active link
   function staffIsActive($file, $current) {
     return $file === $current ? 'bg-primary/10 border-l-4 border-primary text-primary' : 'text-dark hover:text-primary';
   }
@@ -36,7 +36,6 @@
     
     if (!toggleButton || !sidebar) return;
     
-    // Toggle sidebar function
     const toggleSidebar = (e) => {
       e?.stopPropagation();
       const isOpen = sidebar.classList.contains('translate-x-0');
@@ -54,7 +53,6 @@
       }
     };
     
-    // Close when clicking outside on mobile
     const handleOutsideClick = (e) => {
       if (window.innerWidth >= 768) return;
       if (!sidebar.contains(e.target) && !toggleButton.contains(e.target)) {
@@ -65,7 +63,6 @@
       }
     };
     
-    // Handle window resize
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         sidebar.classList.remove('-translate-x-full', 'translate-x-0');
@@ -77,12 +74,11 @@
       }
     };
     
-    // Event listeners
+ 
     toggleButton.addEventListener('click', toggleSidebar);
     document.addEventListener('click', handleOutsideClick);
     window.addEventListener('resize', handleResize);
-    
-    // Initial setup
+ 
     handleResize();
   });
   </script>
@@ -132,7 +128,7 @@
         </a>
       </li>
       <li>
-        <hr class="my-2 border-gray-200 py-28">
+        <hr class="my-2 border-gray-200 ">
       </li>
       <li class="mt-auto">
         <a href="../Auth/logout.php" class="flex items-center gap-3 px-4 py-3 text-dark hover:text-primary">

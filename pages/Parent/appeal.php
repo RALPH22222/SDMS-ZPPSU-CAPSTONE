@@ -6,13 +6,6 @@
 
    require_once __DIR__ . '/../../database/database.php';
 
-   // Auth guard: must be logged in and role = Parent (4)
-   // Uncomment when auth is wired
-   // if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_id']) || (int)$_SESSION['role_id'] !== 4) {
-   //   header('Location: /SDMS/pages/Auth/login.php');
-   //   exit;
-   // }
-
    $parentUserId = (int)($_SESSION['user_id'] ?? 0);
 
    // Fetch children linked to this parent

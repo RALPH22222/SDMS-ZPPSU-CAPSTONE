@@ -45,7 +45,7 @@
         <hr class="my-2 border-white/20 ">
       </li>
       <li>
-        <a href="../Auth/logout.php" class="flex items-center gap-3 px-4 py-20 text-white/80 hover:text-white">
+        <a href="../Auth/logout.php" class="flex items-center gap-3 px-4  text-white/80 hover:text-white">
           <i class="fa-solid fa-right-from-bracket w-5"></i>
           <span class="font-medium">Logout</span>
         </a>

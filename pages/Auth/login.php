@@ -35,6 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } elseif ($role === 5) { 
                     header('Location: /SDMS/pages/Staff/dashboard.php');
                     exit;
+                } elseif ($role === 6) {
+                    header('Location: /SDMS/pages/Staff/dashboard.php');
+                    exit;
                 } else {
                     header('Location: /SDMS/index.php');
                     exit;

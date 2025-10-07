@@ -21,7 +21,7 @@
       throw new Exception('Invalid CSRF token.');
     }
   }
-  $teacherRoleId = 5;
+  $teacherRoleId = 6;
   $checkRole = $pdo->query("SELECT COUNT(*) as count FROM users WHERE role_id = $teacherRoleId")->fetch(PDO::FETCH_ASSOC);
   if ($checkRole['count'] == 0) {
     error_log("WARNING: No users found with role_id = $teacherRoleId. Teachers will not be available for assignment.");

@@ -55,12 +55,17 @@
             $role_id = (int)($_POST['role_id'] ?? 0);
             $is_active = isset($_POST['is_active']) ? 1 : 0;
             $plain = trim($_POST['password'] ?? '');
+            $first_name = trim($_POST['first_name'] ?? '');
+            $middle_name = trim($_POST['middle_name'] ?? '');
+            $last_name = trim($_POST['last_name'] ?? '');
+            $suffix = trim($_POST['suffix'] ?? '');
             
             error_log("Creating user with data: " . print_r($_POST, true));
           
-            if ($username === '' || $role_id <= 0 || $plain === '') {
-                throw new Exception('Username, Role and Password are required.');
+            if ($username === '' || $role_id <= 0 || $plain === '' || $first_name === '' || $last_name === '') {
+                throw new Exception('Username, Name, Role and Password are required.');
             }
+            
             $roleCheck = $pdo->prepare('SELECT id, name FROM roles WHERE id = ?');
             $roleCheck->execute([$role_id]);
             $role = $roleCheck->fetch(PDO::FETCH_ASSOC);
@@ -69,31 +74,123 @@
                 throw new Exception('Invalid role selected (ID: ' . $role_id . '). Available roles: ' . 
                     implode(', ', array_map(function($r) { return $r['id'] . ':' . $r['name']; }, $pdo->query('SELECT id, name FROM roles')->fetchAll(PDO::FETCH_ASSOC))));
             }
+            
             $userCheck = $pdo->prepare('SELECT id FROM users WHERE username = ?');
             $userCheck->execute([$username]);
             if ($userCheck->fetch()) {
                 throw new Exception('Username already exists. Please choose a different username.');
             }
             
+            // For parent role, validate student relationship
+            if ($role['name'] === 'Parent') {
+                $student_id = (int)($_POST['student_id'] ?? 0);
+                $relationship = trim($_POST['relationship'] ?? '');
+                
+                if ($student_id <= 0 || empty($relationship)) {
+                    throw new Exception('Please select a student and specify your relationship.');
+                }
+                
+                // Verify student exists and get their details
+                $studentCheck = $pdo->prepare('SELECT id, first_name, last_name FROM students WHERE id = ?');
+                $studentCheck->execute([$student_id]);
+                $student = $studentCheck->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$student) {
+                    throw new Exception('Selected student not found. Please try again.');
+                }
+                
+                // Set parent's last name to match student's last name if not provided
+                if (empty($last_name)) {
+                    $last_name = $student['last_name'];
+                }
+            }
+            
             $hash = password_hash($plain, PASSWORD_DEFAULT);
-            $columns = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
-            error_log("Users table columns: " . print_r($columns, true));
+            
+            // Insert the user
             $sql = 'INSERT INTO users (username, password_hash, email, contact_number, role_id, is_active, last_login, created_at) ' . 
                    'VALUES (?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP())';
             
-            error_log("Executing SQL: $sql");
-            error_log("With values: " . print_r([$username, $hash, $email, $contact, $role_id, $is_active], true));
+            $params = [
+                $username, 
+                $hash, 
+                $email, 
+                $contact, 
+                $role_id, 
+                $is_active
+            ];
             
             $stmt = $pdo->prepare($sql);
-            $result = $stmt->execute([$username, $hash, $email, $contact, $role_id, $is_active]);
+            $result = $stmt->execute($params);
             
-            if ($result) {
-                $pdo->commit();
-                $_SESSION['flash'] = flash('success', 'User created successfully.');
-                error_log("User created successfully");
-            } else {
+            if (!$result) {
                 throw new Exception('Failed to create user. Database error: ' . implode(' ', $stmt->errorInfo()));
             }
+            
+            $user_id = $pdo->lastInsertId();
+            
+            // Handle role-specific data
+            if ($role['name'] === 'Student') {
+                // Generate a student number (format: YY-XXXX)
+                $current_year = date('y');
+                $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                $student_number = $current_year . '-' . $random_number;
+                $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
+                $address = trim($_POST['address'] ?? '');
+                
+                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                $studentStmt->execute([
+                    $user_id, 
+                    $student_number, 
+                    $first_name,
+                    $middle_name ?: null,
+                    $last_name,
+                    $suffix ?: null,
+                    $birthdate,
+                    $address
+                ]);
+                
+                
+            } elseif ($role['name'] === 'Parent') {
+                $student_id = (int)$_POST['student_id'];
+                $relationship = trim($_POST['relationship']);
+                
+                // Create parent-student relationship
+                $parentStmt = $pdo->prepare('INSERT INTO parent_student (parent_user_id, student_id, relationship, created_at) 
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP())');
+                $parentStmt->execute([$user_id, $student_id, $relationship]);
+                
+                error_log("Created parent-student relationship: parent_user_id=$user_id, student_id=$student_id, relationship=$relationship");
+                
+            } elseif (in_array($role['name'], ['Staff', 'Teacher'])) {
+                $staff_number = trim($_POST['staff_number'] ?? '');
+                $department = trim($_POST['department'] ?? '');
+                $position = trim($_POST['position'] ?? '');
+                
+                if (empty($staff_number) || empty($department) || empty($position)) {
+                    throw new Exception('Staff number, department, and position are required for staff/teacher accounts.');
+                }
+                
+                $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, staff_number, first_name, middle_name, last_name, suffix, department, position, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                $staffStmt->execute([
+                    $user_id,
+                    $staff_number,
+                    $first_name,
+                    $middle_name ?: null,
+                    $last_name,
+                    $suffix ?: null,
+                    $department,
+                    $position
+                ]);
+                
+                error_log("Created staff/teacher record with user_id: $user_id, staff_number: $staff_number");
+            }
+            
+            $pdo->commit();
+            $_SESSION['flash'] = flash('success', 'User created successfully.');
+            error_log("User created successfully with ID: $user_id");
         } catch (PDOException $e) {
             $pdo->rollBack();
             error_log("Database error: " . $e->getMessage());
@@ -111,16 +208,102 @@
       }
 
       if ($action === 'update_user') {
-        $id = (int)($_POST['id'] ?? 0);
-        $username = trim($_POST['username'] ?? '');
-        $email = trim($_POST['email'] ?? '') ?: null;
-        $contact = trim($_POST['contact_number'] ?? '') ?: null;
-        $role_id = (int)($_POST['role_id'] ?? 0);
-        $is_active = isset($_POST['is_active']) ? 1 : 0;
-        if ($id <= 0 || $username === '' || $role_id <= 0) throw new Exception('User ID, Username and Role are required.');
-        $stmt = $pdo->prepare('UPDATE users SET username = ?, email = ?, contact_number = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP() WHERE id = ?');
-        $stmt->execute([$username, $email, $contact, $role_id, $is_active, $id]);
-        $_SESSION['flash'] = flash('success', 'User updated successfully.');
+        $pdo->beginTransaction();
+        try {
+            $id = (int)($_POST['id'] ?? 0);
+            $username = trim($_POST['username'] ?? '');
+            $email = trim($_POST['email'] ?? '') ?: null;
+            $contact = trim($_POST['contact_number'] ?? '') ?: null;
+            $role_id = (int)($_POST['role_id'] ?? 0);
+            $is_active = isset($_POST['is_active']) ? 1 : 0;
+            
+            if ($id <= 0 || $username === '' || $role_id <= 0) {
+                throw new Exception('User ID, Username and Role are required.');
+            }
+            
+            // Get current user data
+            $userStmt = $pdo->prepare('SELECT role_id FROM users WHERE id = ?');
+            $userStmt->execute([$id]);
+            $currentData = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$currentData) {
+                throw new Exception('User not found.');
+            }
+            
+            $current_role_id = (int)$currentData['role_id'];
+            $is_teacher_now = ($role_id == 6); // Teacher role ID is 6
+            $was_teacher = ($current_role_id == 6);
+            $is_student_now = ($role_id == 3); // Student role ID is 3
+            $was_student = ($current_role_id == 3);
+            
+            // Handle role changes
+            if ($is_teacher_now && !$was_teacher) {
+                // Role changed to teacher - create staff record
+                $name_parts = explode('.', $username);
+                $first_name = !empty($name_parts[0]) ? ucfirst($name_parts[0]) : 'Teacher';
+                $last_name = !empty($name_parts[1]) ? ucfirst(explode('@', $name_parts[1])[0]) : 'User';
+
+                $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, first_name, last_name, department, position, created_at) VALUES (?, ?, ?, "Faculty", "Teacher", CURRENT_TIMESTAMP())');
+                $staffStmt->execute([$id, $first_name, $last_name]);
+                error_log("Created staff record for teacher with user_id: $id, name: $first_name $last_name");
+            } 
+            // Handle role change to student
+            elseif ($is_student_now && !$was_student) {
+                // Role changed to student - create student record
+                $name_parts = explode('.', $username);
+                $first_name = !empty($name_parts[0]) ? ucfirst($name_parts[0]) : 'Student';
+                $last_name = !empty($name_parts[1]) ? ucfirst(explode('@', $name_parts[1])[0]) : 'Name';
+                 
+                $current_year = date('y');
+                $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                $student_number = $current_year . '-' . $random_number;
+                
+                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, last_name, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                $studentStmt->execute([$id, $student_number, $first_name, $last_name]);
+                error_log("Created student record for user_id: $id, student_number: $student_number, name: $first_name $last_name");
+            }
+            // Handle role change from teacher to non-teacher
+            elseif (!$is_teacher_now && $was_teacher) {
+                // Role changed from teacher - clean up staff record
+                $pdo->prepare('DELETE FROM staff WHERE user_id = ?')->execute([$id]);
+                error_log("Removed staff record for user_id: $id");
+            }
+            // Handle role change from student to non-student
+            elseif (!$is_student_now && $was_student) {
+                // Role changed from student - clean up student record
+                $pdo->prepare('DELETE FROM students WHERE user_id = ?')->execute([$id]);
+                error_log("Removed student record for user_id: $id");
+            }
+            // Handle role change to teacher
+            elseif ($is_teacher_now && !$was_teacher) {
+                $name_source = !empty($username) ? $username : $email;
+                $name_parts = explode('@', $name_source);
+                $name_parts = explode('.', $name_parts[0]);
+                $first_name = !empty($name_parts[0]) ? ucfirst($name_parts[0]) : 'Teacher';
+                $last_name = !empty($name_parts[1]) ? ucfirst($name_parts[1]) : 'User';
+                
+                $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, first_name, last_name, department, position, created_at) VALUES (?, ?, ?, "Faculty", "Teacher", CURRENT_TIMESTAMP())');
+                $staffStmt->execute([$id, $first_name, $last_name]);
+                error_log("Created staff record for teacher with user_id: $id, name: $first_name $last_name");
+            } 
+
+            elseif (!$is_teacher_now && $was_teacher) {
+                // Role changed from teacher - clean up staff record
+                $pdo->prepare('DELETE FROM staff WHERE user_id = ?')->execute([$id]);
+                error_log("Removed staff record for user_id: $id");
+            }
+            
+            // Update user with new data
+            $stmt = $pdo->prepare('UPDATE users SET username = ?, email = ?, contact_number = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP() WHERE id = ?');
+            $stmt->execute([$username, $email, $contact, $role_id, $is_active, $id]);
+            
+            $pdo->commit();
+            $_SESSION['flash'] = flash('success', 'User updated successfully.');
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+        
         header('Location: ' . basename($_SERVER['PHP_SELF']));
         exit;
       }
@@ -240,7 +423,7 @@
       <?php if ($flash['type']): ?>
         <div class="hidden" id="flashData"
              data-type="<?php echo $flash['type']==='success'?'success':'error'; ?>"
-             data-msg='<?php echo json_encode($flash['msg']); ?>'></div>
+             data-msg="<?php echo htmlspecialchars($flash['msg'], ENT_QUOTES, 'UTF-8'); ?>"></div>
       <?php endif; ?>
 
       <form method="get" class="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -327,28 +510,53 @@
       <input type="hidden" name="id" value="" />
       
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Basic Information for All Users -->
         <div class="sm:col-span-2">
           <label class="block text-sm font-medium mb-1">Username <span class="text-red-500">*</span></label>
-          <input type="text" name="username" class="w-full border rounded px-3 py-2" required />
+          <input type="text" name="username" id="username" class="w-full border rounded px-3 py-2" required />
         </div>
         
         <div>
-          <label class="block text-sm font-medium mb-1">Email</label>
-          <input type="email" name="email" class="w-full border rounded px-3 py-2" />
+          <label class="block text-sm font-medium mb-1">First Name <span class="text-red-500">*</span></label>
+          <input type="text" name="first_name" id="first_name" class="w-full border rounded px-3 py-2" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Last Name <span class="text-red-500">*</span></label>
+          <input type="text" name="last_name" id="last_name" class="w-full border rounded px-3 py-2" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Middle Name</label>
+          <input type="text" name="middle_name" id="middle_name" class="w-full border rounded px-3 py-2" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Suffix</label>
+          <input type="text" name="suffix" id="suffix" placeholder="e.g., Jr., Sr., III" class="w-full border rounded px-3 py-2" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium mb-1">Email <span class="text-red-500">*</span></label>
+          <input type="email" name="email" id="email" class="w-full border rounded px-3 py-2" required />
         </div>
         
         <div>
           <label class="block text-sm font-medium mb-1">Contact Number</label>
-          <input type="text" name="contact_number" class="w-full border rounded px-3 py-2" />
+          <input type="text" name="contact_number" id="contact_number" class="w-full border rounded px-3 py-2" />
         </div>
         
         <div>
           <label class="block text-sm font-medium mb-1">Role <span class="text-red-500">*</span></label>
-          <select name="role_id" class="w-full border rounded px-3 py-2" required>
+          <select name="role_id" id="role_id" onchange="toggleRoleFields()" class="w-full border rounded px-3 py-2" required>
             <option value="">Select Role</option>
-            <?php foreach ($roles as $r): ?>
-              <option value="<?php echo (int)$r['id']; ?>"><?php echo htmlspecialchars($r['name']); ?></option>
-            <?php endforeach; ?>
+            <?php 
+            $roleMap = [];
+            foreach ($roles as $r) {
+                $roleMap[strtolower($r['name'])] = $r['id'];
+                echo '<option value="' . (int)$r['id'] . '">' . htmlspecialchars($r['name']) . '</option>';
+            }
+            ?>
           </select>
         </div>
         
@@ -369,6 +577,69 @@
             <button type="button" onclick="genPwd('#password')" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
               <i class="fa fa-refresh"></i>
             </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Student Specific Fields -->
+      <div id="studentFieldsContainer" class="hidden border-t pt-4 mt-4 space-y-4">
+        <h4 class="font-medium text-gray-900">Student Information</h4>
+        <!-- Student Fields -->
+        <div id="studentFields">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="student_number" class="block text-sm font-medium mb-1">Student Number <span class="text-red-500">*</span></label>
+              <input type="text" name="student_number" id="student_number" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+              <label for="birthdate" class="block text-sm font-medium mb-1">Birthdate <span class="text-red-500">*</span></label>
+              <input type="date" name="birthdate" id="birthdate" class="w-full border rounded px-3 py-2" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="address" class="block text-sm font-medium mb-1">Address <span class="text-red-500">*</span></label>
+              <textarea name="address" id="address" class="w-full border rounded px-3 py-2" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Parent Specific Fields -->
+      <div id="parentFields" class="hidden border-t pt-4 mt-4 space-y-4">
+        <h4 class="font-medium text-gray-900">Parent Information</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="sm:col-span-2">
+            <label for="student_id" class="block text-sm font-medium mb-1">Student ID <span class="text-red-500">*</span></label>
+            <input type="text" name="student_id" id="student_id" class="w-full border rounded px-3 py-2" placeholder="Enter student ID" />
+          </div>
+          <div class="sm:col-span-2">
+            <label for="relationship" class="block text-sm font-medium mb-1">Relationship <span class="text-red-500">*</span></label>
+            <select name="relationship" id="relationship" class="w-full border rounded px-3 py-2">
+              <option value="">Select Relationship</option>
+              <option value="Mother">Mother</option>
+              <option value="Father">Father</option>
+              <option value="Guardian">Guardian</option>
+              <option value="Sibling">Sibling</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Staff/Teacher Common Fields -->
+      <div id="staffTeacherFields" class="hidden border-t pt-4 mt-4 space-y-4">
+        <h4 class="font-medium text-gray-900">Employment Information</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Staff/Teacher ID <span class="text-red-500">*</span></label>
+            <input type="text" name="staff_number" id="staff_number" class="w-full border rounded px-3 py-2 bg-gray-100" readonly />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Department <span class="text-red-500">*</span></label>
+            <input type="text" name="department" id="department" class="w-full border rounded px-3 py-2" placeholder="e.g., IT, Math, Science" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium mb-1">Position <span class="text-red-500">*</span></label>
+            <input type="text" name="position" id="position" class="w-full border rounded px-3 py-2" placeholder="e.g., Teacher, Head, Coordinator" />
           </div>
         </div>
       </div>
@@ -487,32 +758,76 @@
 </div>
 
 <script>
+  // Initialize modal elements
   const userModal = document.getElementById('userModal');
   const rolesModal = document.getElementById('rolesModal');
   const resetModal = document.getElementById('resetModal');
   const userForm = document.getElementById('userForm');
   const userModalTitle = document.getElementById('userModalTitle');
   const passwordRow = document.getElementById('passwordRow');
-
-  document.getElementById('btnOpenCreateUser').addEventListener('click', () => openCreateUser());
+  const btnOpenCreateUser = document.getElementById('btnOpenCreateUser');
   const rolesBtn = document.getElementById('btnOpenRoles');
+
+  // Add event listeners
+  if (btnOpenCreateUser) {
+    btnOpenCreateUser.addEventListener('click', openCreateUser);
+  }
+  
   if (rolesBtn) {
-    rolesBtn.addEventListener('click', () => openRoles());
+    rolesBtn.addEventListener('click', openRoles);
   }
 
   function openCreateUser() {
+    if (!userModal || !userForm || !userModalTitle) return;
+    
     userModalTitle.textContent = 'Create User';
     userForm.action.value = 'create_user';
+    userForm.reset();
     userForm.id.value = '';
     userForm.username.value = '';
+    userForm.first_name.value = '';
+    userForm.middle_name.value = '';
+    userForm.last_name.value = '';
+    userForm.suffix.value = '';
     userForm.email.value = '';
     userForm.contact_number.value = '';
     userForm.role_id.value = '';
     userForm.is_active.checked = true;
     userForm.password.required = true;
     passwordRow.classList.remove('hidden');
+    
+    // Reset all role-specific fields
+    [
+      'student_number', 'birthdate', 'address',  // Student
+      'student_id', 'relationship',              // Parent
+      'staff_number', 'department', 'position'   // Staff/Teacher
+    ].forEach(field => {
+      const el = document.getElementById(field);
+      if (el) el.value = '';
+    });
+    
+    // Hide all role-specific sections and reset required fields
+    ['studentFieldsContainer', 'parentFields', 'staffFields', 'teacherFields'].forEach(id => {
+      const section = document.getElementById(id);
+      if (section) {
+        section.classList.add('hidden');
+        section.querySelectorAll('input, select, textarea').forEach(field => {
+          field.required = false;
+        });
+      }
+    });
+    
+    // Set required for basic fields
+    ['first_name', 'last_name', 'username', 'email'].forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (field) field.required = true;
+    });
+    
     show(userModal);
     genPwd('#password');
+    
+    // Initialize role fields based on default selection
+    toggleRoleFields();
   }
 
   function openEditUser(u) {
@@ -520,6 +835,10 @@
     userForm.action.value = 'update_user';
     userForm.id.value = u.id;
     userForm.username.value = u.username || '';
+    userForm.first_name.value = u.first_name || '';
+    userForm.middle_name.value = u.middle_name || '';
+    userForm.last_name.value = u.last_name || '';
+    userForm.suffix.value = u.suffix || '';
     userForm.email.value = u.email || '';
     userForm.contact_number.value = u.contact_number || '';
     userForm.role_id.value = u.role_id || '';
@@ -527,8 +846,190 @@
     userForm.password.value = '';
     userForm.password.required = false;
     passwordRow.classList.add('hidden');
+    
+    // Set role-specific fields if they exist in the user object
+    const roleFields = {
+      // Student fields
+      student_number: u.student_number,
+      birthdate: u.birthdate,
+      address: u.address,
+      // Parent fields
+      student_id: u.student_id,
+      relationship: u.relationship,
+      // Staff/Teacher fields
+      staff_number: u.staff_number,
+      department: u.department,
+      position: u.position
+    };
+    
+    Object.entries(roleFields).forEach(([fieldId, value]) => {
+      const field = document.getElementById(fieldId);
+      if (field && value !== undefined) {
+        field.value = value;
+      }
+    });
+    
+    // Toggle role fields to show/hide appropriate sections and set required attributes
+    toggleRoleFields();
+    
     show(userModal);
   }
+
+  // Role ID mappings
+  const roleIds = {
+    admin: <?php echo $roleMap['admin'] ?? 1; ?>,
+    student: <?php echo $roleMap['student'] ?? 3; ?>,
+    parent: <?php echo $roleMap['parent'] ?? 4; ?>,
+    staff: <?php echo $roleMap['staff'] ?? 2; ?>,
+    teacher: <?php echo $roleMap['teacher'] ?? ($roleMap['staff'] ?? 2); ?>
+  };
+
+  // Function to generate the next staff number
+  async function generateNextStaffNumber() {
+    try {
+      const response = await fetch('get_next_staff_number.php');
+      const data = await response.json();
+      if (data.success && data.staff_number) {
+        document.getElementById('staff_number').value = data.staff_number;
+      } else {
+        // Fallback: Generate client-side if API fails
+        const currentYear = new Date().getFullYear();
+        const randomNum = Math.floor(1000 + Math.random() * 9000); // Random 4-digit number
+        document.getElementById('staff_number').value = `${currentYear}-${randomNum}`;
+      }
+    } catch (error) {
+      console.error('Error generating staff number:', error);
+      // Fallback in case of error
+      const currentYear = new Date().getFullYear();
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      document.getElementById('staff_number').value = `${currentYear}-${randomNum}`;
+    }
+  }
+  
+  // Role IDs mapping for better maintainability
+  const ROLE_IDS = {
+    ADMIN: 1,
+    STAFF: 2,
+    STUDENT: 3,
+    PARENT: 4,
+    TEACHER: 5
+  };
+
+  function toggleRoleFields() {
+    const roleSelect = document.getElementById('role_id');
+    if (!roleSelect) return;
+    
+    const roleId = parseInt(roleSelect.value);
+    if (isNaN(roleId)) return;
+    
+    // Get all role-specific containers
+    const roleContainers = {
+      student: document.getElementById('studentFieldsContainer'),
+      parent: document.getElementById('parentFields'),
+      staff: document.getElementById('staffFields'),
+      teacher: document.getElementById('teacherFields')
+    };
+    
+    // Hide all role-specific fields first
+    Object.values(roleContainers).forEach(container => {
+      if (container) container.classList.add('hidden');
+    });
+    
+    // Reset all role-specific required fields
+    const allRoleFields = [
+      'student_number', 'birthdate', 'address', // Student
+      'student_id', 'relationship',            // Parent
+      'department', 'position'                 // Staff/Teacher
+    ];
+    
+    allRoleFields.forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (field) field.required = false;
+    });
+    
+    // Show and set required fields based on role
+    switch (roleId) {
+      case ROLE_IDS.STUDENT:
+        if (roleContainers.student) {
+          roleContainers.student.classList.remove('hidden');
+          const studentFields = ['student_number', 'birthdate', 'address', 'first_name', 'last_name'];
+          studentFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.required = true;
+          });
+        }
+        break;
+        
+      case ROLE_IDS.PARENT:
+        if (roleContainers.parent) {
+          roleContainers.parent.classList.remove('hidden');
+          const parentFields = ['student_id', 'relationship', 'first_name', 'last_name'];
+          parentFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.required = true;
+          });
+        }
+        break;
+        
+      case ROLE_IDS.STAFF:
+      case ROLE_IDS.TEACHER:
+        if (roleContainers.staff) roleContainers.staff.classList.remove('hidden');
+        if (roleId === ROLE_IDS.TEACHER && roleContainers.teacher) {
+          roleContainers.teacher.classList.remove('hidden');
+        }
+        
+        generateNextStaffNumber();
+        
+        const staffFields = ['department', 'position', 'first_name', 'last_name'];
+        staffFields.forEach(fieldId => {
+          const field = document.getElementById(fieldId);
+          if (field) field.required = true;
+        });
+        break;
+    }
+    
+    // Always require first_name and last_name
+    ['first_name', 'last_name'].forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (field) field.required = true;
+    });
+  }
+
+  function resetFormFields() {
+    document.getElementById('staff_number').value = '';
+    document.getElementById('department').value = '';
+    document.getElementById('position').value = '';
+    document.getElementById('first_name').value = '';
+    document.getElementById('last_name').value = '';
+    document.getElementById('middle_name').value = '';
+    document.getElementById('suffix').value = '';
+    document.getElementById('studentFields').classList.add('hidden');
+    document.getElementById('parentFields').classList.add('hidden');
+    document.getElementById('staffTeacherFields').classList.add('hidden');
+  }
+
+  // Store the original openEditUser function if it exists
+  const originalOpenEditUser = window.openEditUser || function() {};
+  
+  // Override the openEditUser function
+  window.openEditUser = function(u) {
+    // Call the original function if it exists
+    if (typeof originalOpenEditUser === 'function') {
+      originalOpenEditUser(u);
+    }
+    
+    // Update user details
+    const fields = ['first_name', 'last_name', 'middle_name', 'suffix'];
+    fields.forEach(field => {
+      if (u[field]) {
+        const el = document.getElementById(field);
+        if (el) el.value = u[field];
+      }
+    });
+    
+    // Initialize role fields after a small delay to ensure DOM is updated
+    setTimeout(toggleRoleFields, 50);
+  };
 
   function closeUserModal() { hide(userModal); }
 
@@ -565,11 +1066,12 @@
     }
     return pwd;
   }
+
   document.addEventListener('DOMContentLoaded', () => {
     const flash = document.getElementById('flashData');
     if (flash && window.Swal) {
       const type = flash.getAttribute('data-type') || 'info';
-      const msg = JSON.parse(flash.getAttribute('data-msg') || '""');
+      const msg = flash.getAttribute('data-msg') || '';
       Swal.fire({ icon: type, title: type === 'success' ? 'Success' : 'Error', text: msg });
     }
     document.querySelectorAll('form.confirm-toggle').forEach((f) => {

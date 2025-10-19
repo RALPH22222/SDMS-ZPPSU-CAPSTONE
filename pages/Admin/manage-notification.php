@@ -27,33 +27,81 @@ if (isset($_GET['action'])) {
   $action = $_GET['action'];
   try {
     if ($action === 'list') {
-      $onlyUnread = isset($_GET['unread']) && (int)$_GET['unread'] === 1;
-      $methodId = isset($_GET['method_id']) ? (int)$_GET['method_id'] : 0;
-      $params = [':uid' => $adminId];
-      $where = 'WHERE n.user_id = :uid';
-      if ($onlyUnread) {
-        $where .= ' AND n.is_read = 0';
+      try {
+        error_log("Fetching notifications for admin ID: $adminId");
+        
+        $onlyUnread = isset($_GET['unread']) && (int)$_GET['unread'] === 1;
+        $methodId = isset($_GET['method_id']) ? (int)$_GET['method_id'] : 0;
+        
+        // Log the request parameters
+        error_log("List params - unread: " . ($onlyUnread ? 'true' : 'false') . ", method_id: $methodId");
+        
+        $params = [];
+        $where = 'WHERE 1=1'; // Show all notifications for admin
+        
+        if ($onlyUnread) {
+          $where .= ' AND n.is_read = 0';
+        }
+        
+        if ($methodId > 0) {
+          $where .= ' AND n.method_id = :mid';
+          $params[':mid'] = $methodId;
+        }
+        
+        // Get all notifications with user and case details
+        $sql = "
+          SELECT 
+            n.*,
+            u.username,
+            m.name AS method_name,
+            c.case_number, 
+            c.title AS case_title,
+            CASE 
+              WHEN n.message LIKE '%Appeal%' THEN 'appeal'
+              WHEN n.case_id IS NOT NULL THEN 'case'
+              ELSE 'system'
+            END AS notification_type
+          FROM notifications n
+          LEFT JOIN users u ON n.user_id = u.id
+          LEFT JOIN notification_method m ON m.id = n.method_id
+          LEFT JOIN cases c ON c.id = n.case_id
+          $where
+          ORDER BY n.created_at DESC, n.id DESC
+          LIMIT 300
+        ";
+        
+        error_log("Executing SQL: $sql");
+        error_log("With params: " . json_encode($params));
+        
+        $stmt = $pdo->prepare($sql);
+        if (!$stmt) {
+          throw new Exception('Failed to prepare statement: ' . implode(', ', $pdo->errorInfo()));
+        }
+        
+        $result = $stmt->execute($params);
+        if (!$result) {
+          throw new Exception('Failed to execute statement: ' . implode(', ', $stmt->errorInfo()));
+        }
+        
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Fetched " . count($rows) . " notifications");
+        
+        // Log first few notifications for debugging
+        foreach (array_slice($rows, 0, 3) as $i => $row) {
+          error_log(sprintf("Notification #%d: ID=%d, Message=%s, CaseID=%s", 
+            $i + 1, 
+            $row['id'], 
+            substr($row['message'] ?? '', 0, 50),
+            $row['case_id'] ?? 'NULL'
+          ));
+        }
+        
+        jsonResponse(['ok' => true, 'items' => $rows]);
+        
+      } catch (Exception $e) {
+        error_log("Error in notification list: " . $e->getMessage());
+        jsonResponse(['ok' => false, 'error' => 'Failed to fetch notifications: ' . $e->getMessage()], 500);
       }
-      if ($methodId > 0) {
-        $where .= ' AND n.method_id = :mid';
-        $params[':mid'] = $methodId;
-      }
-      $sql = "
-        SELECT n.id, n.message, n.is_read, n.created_at, n.method_id,
-               m.name AS method_name,
-               n.case_id,
-               c.case_number, c.title AS case_title
-        FROM notifications n
-        LEFT JOIN notification_method m ON m.id = n.method_id
-        LEFT JOIN cases c ON c.id = n.case_id
-        $where
-        ORDER BY n.created_at DESC, n.id DESC
-        LIMIT 300
-      ";
-      $stmt = $pdo->prepare($sql);
-      $stmt->execute($params);
-      $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      jsonResponse(['ok' => true, 'items' => $rows]);
     }
 
     if ($action === 'mark_read' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -284,7 +332,11 @@ require_once __DIR__ . '/../../components/admin-head.php';
             <div class="font-medium text-dark">${escapeHtml(n.message || '')}</div>
             <div class="text-xs text-gray mt-1">
               ${n.method_name ? escapeHtml(n.method_name) + ' • ' : ''}
-              ${n.case_number ? ('Case ' + escapeHtml(n.case_number) + (n.case_title ? ': ' + escapeHtml(n.case_title) : '')) : ''}
+              ${n.case_number ? 
+                `<a href="manage-cases.php?view=${n.case_id}" class="text-primary hover:underline">` + 
+                'Case ' + escapeHtml(n.case_number) + 
+                (n.case_title ? ': ' + escapeHtml(n.case_title) : '') + 
+                '</a>' : ''}
             </div>
             <div class="text-[11px] text-gray mt-1">${whenStr}</div>
           </div>

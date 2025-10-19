@@ -1,4 +1,4 @@
-﻿<?php
+<?php
   // Staff: Submit Disciplinary Report
   if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -17,6 +17,7 @@
   }
 
   require_once __DIR__ . '/../../database/database.php';
+  require_once __DIR__ . '/../../includes/notification_functions.php';
 
   $currentUserId = (int)($_SESSION['user_id'] ?? 0);
   // Map to staff.id if available (so we can match cases.reported_by_staff_id)
@@ -95,6 +96,19 @@
       $stmt->execute([$case_number, $student_id, ($currentStaffId ?? $currentUserId), $violation_type_id, $title, $description, $location, $incident_dt, $is_confidential]);
       $case_id = (int)$pdo->lastInsertId();
 
+if (!$is_confidential) {
+    // Get violation type name for notification
+    $vtStmt = $pdo->prepare('SELECT name FROM violation_types WHERE id = ?');
+    $vtStmt->execute([$violation_type_id]);
+    $violationTypeName = $vtStmt->fetchColumn() ?: 'a disciplinary violation';
+    
+    // Send notifications to parents
+    error_log("Sending notification to parents for case #$case_number");
+    $notifyResult = notifyParentsOfReportedStudent($student_id, $case_id, $case_number, $violationTypeName);
+    error_log("Parent notification result: " . ($notifyResult ? 'success' : 'failed'));
+} else {
+    error_log("Case #$case_number is confidential, skipping parent notifications");
+}     
       // Evidence upload (optional, single file)
       if (!empty($_FILES['evidence']['name'])) {
         // store a relative web path used by staff pages
@@ -117,6 +131,84 @@
 
         $stmtEv = $pdo->prepare('INSERT INTO case_evidence (case_id, uploaded_by_user_id, filename, file_path, file_type, file_size) VALUES (?,?,?,?,?,?)');
         $stmtEv->execute([$case_id, $currentUserId, $originalName, $relativePath, $mime, $size]);
+      }
+
+      // Send notification to admins
+      try {
+        error_log("Getting admin recipients...");
+        $adminIds = getAdminRecipients();
+        error_log("Admin recipients: " . print_r($adminIds, true));
+        
+        if (!empty($adminIds)) {
+          // Get violation type name
+          $violationStmt = $pdo->prepare("SELECT name FROM violation_types WHERE id = ?");
+          $violationStmt->execute([$violation_type_id]);
+          $violationType = $violationStmt->fetchColumn();
+          
+          // Get student name
+          $studentStmt = $pdo->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM students WHERE id = ?");
+          $studentStmt->execute([$student_id]);
+          $studentName = $studentStmt->fetchColumn();
+          
+          if ($violationType === false || $studentName === false) {
+            error_log("Failed to fetch case details for notification. Violation type: " . ($violationType === false ? 'not found' : 'found') . ", Student: " . ($studentName === false ? 'not found' : 'found'));
+          } else {
+            // Notify admins
+            $adminMessage = "New case #$case_number filed for $studentName - $violationType: $title";
+            error_log("Sending notification to admins: $adminMessage");
+            
+            $notificationSent = sendNotification($adminIds, $adminMessage, 1, $case_id);
+            if (!$notificationSent) {
+              error_log("Failed to send admin notification for case #$case_number");
+            } else {
+              error_log("Successfully sent admin notification for case #$case_number");
+            }
+
+            // Notify student if they have a user account
+            $studentStmt = $pdo->prepare("SELECT user_id, CONCAT(first_name, ' ', last_name) as student_name FROM students WHERE id = ?");
+            $studentStmt->execute([$student_id]);
+            $student = $studentStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($student && !empty($student['user_id'])) {
+              $studentMessage = "A new case has been filed against you: $title";
+              error_log("Sending notification to student (User ID: {$student['user_id']}): {$studentMessage}");
+              
+              // Send notification (method_id 1 is for system notifications)
+              $notificationSent = sendNotification($student['user_id'], $studentMessage, 1, $case_id);
+              
+              if (!$notificationSent) {
+                error_log("Failed to send notification to student for case #{$case_number}");
+              }
+            }
+
+            // Notify parents of the student
+            $parentStmt = $pdo->prepare("
+                SELECT parent_user_id 
+                FROM parent_student 
+                WHERE student_id = ?
+            ");
+            $parentStmt->execute([$student_id]);
+            $parentIds = $parentStmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (!empty($parentIds)) {
+                $parentMessage = "A new case has been filed for your child $studentName: $title";
+                error_log("Sending notification to parents: " . implode(', ', $parentIds) . ": $parentMessage");
+                
+                foreach ($parentIds as $parentId) {
+                    $notificationSent = sendNotification($parentId, $parentMessage, 1, $case_id);
+                    if (!$notificationSent) {
+                        error_log("Failed to send notification to parent ID $parentId for case #$case_number");
+                    }
+                }
+            }
+          }
+        } else {
+          error_log("No admin users found to send notification to");
+        }
+      } catch (Exception $e) {
+        // Log the error but don't fail the entire operation
+        error_log("Error in notification process: " . $e->getMessage());
+        error_log("Stack trace: " . $e->getTraceAsString());
       }
 
       $pdo->commit();

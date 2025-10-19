@@ -36,26 +36,82 @@ if (isset($_GET['action'])) {
     if ($action === 'list') {
       $onlyUnread = isset($_GET['unread']) && (int)$_GET['unread'] === 1;
       $methodId = isset($_GET['method_id']) ? (int)$_GET['method_id'] : 0;
+      
+      // Get all student IDs linked to this parent
+      $stmt = $pdo->prepare("
+          SELECT student_id 
+          FROM parent_student 
+          WHERE parent_user_id = ?
+      
+      ");
+      $stmt->execute([$parentId]);
+      $studentIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+      
+      // Build the WHERE clause to include both direct notifications and student-linked cases
       $params = [':uid' => $parentId];
-      $where = 'WHERE n.user_id = :uid';
-      if ($onlyUnread) { $where .= ' AND n.is_read = 0'; }
-      if ($methodId > 0) { $where .= ' AND n.method_id = :mid'; $params[':mid'] = $methodId; }
+      $where = 'WHERE (n.user_id = :uid';
+      
+      // Add student-linked cases if parent has any linked students
+      if (!empty($studentIds)) {
+          $placeholders = [];
+          foreach ($studentIds as $i => $studentId) {
+              $param = ':sid' . $i;
+              $placeholders[] = $param;
+              $params[$param] = $studentId;
+          }
+          $studentList = implode(',', $placeholders);
+          $where .= " OR (n.case_id IN (
+              SELECT c.id FROM cases c 
+              JOIN students s ON c.student_id = s.id 
+              WHERE s.id IN ($studentList) 
+              AND (c.is_confidential = 0 OR c.is_confidential IS NULL)
+          ))";
+      }
+      $where .= ')';
+      
+      if ($onlyUnread) { 
+          $where .= ' AND n.is_read = 0'; 
+      }
+      if ($methodId > 0) { 
+          $where .= ' AND n.method_id = :mid'; 
+          $params[':mid'] = $methodId; 
+      }
+      
       $sql = "
         SELECT n.id, n.message, n.is_read, n.created_at, n.method_id,
                m.name AS method_name,
                n.case_id,
-               c.case_number, c.title AS case_title
+               c.case_number, 
+               c.title AS case_title,
+               s.first_name AS student_first_name,
+               s.last_name AS student_last_name
         FROM notifications n
         LEFT JOIN notification_method m ON m.id = n.method_id
         LEFT JOIN cases c ON c.id = n.case_id
+        LEFT JOIN students s ON c.student_id = s.id
         $where
         ORDER BY n.created_at DESC, n.id DESC
         LIMIT 300
       ";
+      
       $stmt = $pdo->prepare($sql);
       $stmt->execute($params);
       $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      jsonResponse(['ok' => true, 'items' => $rows]);
+      
+      // Format the response to include student names in the message
+      $result = [
+          'ok' => true,
+          'items' => array_map(function($row) {
+              // If this is a student-linked case, prepend the student's name to the message
+              if (!empty($row['student_first_name']) && !empty($row['student_last_name'])) {
+                  $studentName = $row['student_first_name'] . ' ' . $row['student_last_name'];
+                  $row['message'] = $studentName . ': ' . $row['message'];
+              }
+              return $row;
+          }, $rows)
+      ];
+      
+      jsonResponse($result);
     }
 
     if ($action === 'mark_read' && $_SERVER['REQUEST_METHOD'] === 'POST') {

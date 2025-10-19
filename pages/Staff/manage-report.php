@@ -1,4 +1,4 @@
-﻿<?php
+<?php
   // Staff: Manage Reports (create, view, edit, delete cases reported by this staff)
   if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -95,6 +95,37 @@
 
         $stmt = $pdo->prepare('INSERT INTO cases (id, case_number, student_id, reported_by_staff_id, violation_type_id, title, description, location, incident_date, status_id, resolution, resolution_date, is_confidential, created_at, updated_at) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, NULL, ?, CURRENT_TIMESTAMP(), NULL)');
         $stmt->execute([$case_number, $student_id, ($currentStaffId ?? $currentUserId), $violation_type_id, $title, $description, $location, $incident_dt, $is_confidential]);
+        $caseId = $pdo->lastInsertId();
+
+        // Send notification to the student
+        try {
+            // Get student's user ID
+            $stmt = $pdo->prepare('SELECT user_id FROM students WHERE id = ?');
+            $stmt->execute([$student_id]);
+            $studentUserId = $stmt->fetchColumn();
+            
+            if ($studentUserId) {
+                // Include notification functions
+                require_once __DIR__ . '/../../includes/notification_functions.php';
+                
+                // Prepare notification message
+                $message = "A new report has been filed against you: {$title}";
+                
+                // Send notification (method_id 1 is for system notifications)
+                sendNotification($studentUserId, $message, 1, $caseId);
+            }
+        } catch (Exception $e) {
+            // Log error but don't interrupt the flow
+            error_log("Failed to send notification to student: " . $e->getMessage());
+        }
+
+        // Send notification to admins
+        require_once __DIR__ . '/../../includes/notification_functions.php';
+        $adminIds = getAdminRecipients();
+        if (!empty($adminIds)) {
+            $message = "New case #$case_number reported: $title";
+            sendNotification($adminIds, $message, 1, $caseId);
+        }
 
         $_SESSION['flash'] = flash('success', 'Report created successfully.');
         header('Location: ' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($_GET));
@@ -136,6 +167,36 @@
 
         $upd = $pdo->prepare($sql);
         $upd->execute($params);
+
+        // Send notification to the student about the update
+        try {
+            // Get student's user ID
+            $stmt = $pdo->prepare('SELECT user_id FROM students WHERE id = ?');
+            $stmt->execute([$student_id]);
+            $studentUserId = $stmt->fetchColumn();
+            
+            if ($studentUserId) {
+                // Include notification functions if not already included
+                require_once __DIR__ . '/../../includes/notification_functions.php';
+                
+                // Prepare notification message
+                $statusText = '';
+                if ($status_id !== null) {
+                    $stmt = $pdo->prepare('SELECT name FROM case_status WHERE id = ?');
+                    $stmt->execute([$status_id]);
+                    $statusName = $stmt->fetchColumn();
+                    $statusText = ", Status: " . ($statusName ?: 'Updated');
+                }
+                
+                $message = "Your report has been updated: {$title}{$statusText}";
+                
+                // Send notification (method_id 1 is for system notifications)
+                sendNotification($studentUserId, $message, 1, $case_id);
+            }
+        } catch (Exception $e) {
+            // Log error but don't interrupt the flow
+            error_log("Failed to send update notification to student: " . $e->getMessage());
+        }
 
         $_SESSION['flash'] = flash('success', 'Report updated successfully.');
         header('Location: ' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($_GET));

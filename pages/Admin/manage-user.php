@@ -807,7 +807,7 @@
     });
     
     // Hide all role-specific sections and reset required fields
-    ['studentFieldsContainer', 'parentFields', 'staffFields', 'teacherFields'].forEach(id => {
+    ['studentFieldsContainer', 'parentFields', 'staffTeacherFields'].forEach(id => {
       const section = document.getElementById(id);
       if (section) {
         section.classList.add('hidden');
@@ -909,10 +909,10 @@
   // Role IDs mapping for better maintainability
   const ROLE_IDS = {
     ADMIN: 1,
-    STAFF: 2,
+    STAFF: 5,
     STUDENT: 3,
     PARENT: 4,
-    TEACHER: 5
+    TEACHER: 6
   };
 
   function toggleRoleFields() {
@@ -926,8 +926,8 @@
     const roleContainers = {
       student: document.getElementById('studentFieldsContainer'),
       parent: document.getElementById('parentFields'),
-      staff: document.getElementById('staffFields'),
-      teacher: document.getElementById('teacherFields')
+      staff: document.getElementById('staffTeacherFields'),
+      teacher: document.getElementById('staffTeacherFields')
     };
     
     // Hide all role-specific fields first

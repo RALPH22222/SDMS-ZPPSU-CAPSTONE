@@ -18,7 +18,6 @@
 
   $currentUserId = (int)($_SESSION['user_id'] ?? 0);
 
-  // Map to staff.id if available (so we can match cases.reported_by_staff_id)
   $currentStaffId = null;
   try {
     $stf = $pdo->prepare('SELECT id FROM staff WHERE user_id = ? LIMIT 1');

@@ -28,6 +28,16 @@ try {
 } catch (Throwable $e) {
   $children = [];
 }
+
+// Get notification count for the parent
+$notificationCount = 0;
+try {
+  $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+  $stmt->execute([$parentUserId]);
+  $notificationCount = (int)$stmt->fetchColumn();
+} catch (PDOException $e) {
+  error_log('Error fetching notification count: ' . $e->getMessage());
+}
 // Preload cases per child
 $casesByStudent = [];
 if (!empty($children)) {
@@ -61,14 +71,36 @@ include __DIR__ . '/../../components/parent-head.php';
   <?php include __DIR__ . '/../../components/parent-sidebar.php'; ?>
 
   <main class="flex-1 md:ml-64">
-    <!-- Top bar -->
-    <div class="h-16 flex items-center px-4 border-b border-gray-200 bg-white sticky top-0 z-40">
-      <button id="parentSidebarToggle" class="md:hidden text-primary text-xl mr-3" aria-label="Toggle Sidebar">
-        <i class="fa-solid fa-bars"></i>
-      </button>
-      <h1 class="text-xl font-bold text-primary">Parent Dashboard</h1>
-      <div class="ml-auto text-sm text-gray">
-        Logged in as: <span class="font-medium text-dark"><?php echo htmlspecialchars($_SESSION['email'] ?? $_SESSION['username'] ?? 'Parent'); ?></span>
+    <!-- Mobile Header -->
+    <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+      <div class="h-16 flex items-center px-4">
+        <button id="parentSidebarToggle" class="text-primary text-2xl mr-3">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="text-primary font-bold flex-grow">Parent Dashboard</div>
+        <a href="manage-notification.php" class="relative text-primary text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+          <i class="fa-solid fa-bell"></i>
+          <?php if ($notificationCount > 0): ?>
+            <span class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+              <?php echo $notificationCount > 9 ? '9+' : $notificationCount; ?>
+            </span>
+          <?php endif; ?>
+        </a>
+      </div>
+    </div>
+
+    <!-- Desktop Header -->
+    <div class="hidden md:flex sticky top-0 z-40 bg-white border-b border-gray-200 h-16 items-center px-6 justify-between">
+      <h1 class="text-xl font-bold text-primary">Dashboard</h1>
+      <div class="flex items-center space-x-4">
+        <a href="notifications.php" class="relative text-primary text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+          <i class="fa-solid fa-bell"></i>
+          <?php if (($notificationCount ?? 0) > 0): ?>
+            <span class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+              <?php echo ($notificationCount ?? 0) > 9 ? '9+' : ($notificationCount ?? 0); ?>
+            </span>
+          <?php endif; ?>
+        </a>
       </div>
     </div>
 

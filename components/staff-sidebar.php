@@ -122,12 +122,6 @@
         </a>
       </li>
       <li>
-        <a href="notifications.php" class="flex items-center gap-3 px-4 py-3 <?php echo staffIsActive('notifications.php', $current); ?>">
-          <i class="fa-solid fa-bell w-5"></i>
-          <span class="font-medium">Notifications</span>
-        </a>
-      </li>
-      <li>
         <hr class="my-2 border-gray-200 ">
       </li>
       <li class="mt-auto">

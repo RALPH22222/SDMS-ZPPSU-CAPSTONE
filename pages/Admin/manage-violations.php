@@ -156,21 +156,31 @@
              data-type="<?php echo $flash['type']==='success'?'success':'error'; ?>"
              data-msg='<?php echo json_encode($flash['msg']); ?>'></div>
       <?php endif; ?>
-      <div class="border-b border-gray-200 mb-4">
-        <nav class="-mb-px flex flex-wrap gap-2" aria-label="Tabs">
-          <?php foreach ($categories as $cat): $cid=(int)$cat['id']; $active=$cid===$currentTab; ?>
-            <a href="?tab=<?php echo $cid; ?>" class="px-4 py-2 border-b-2 <?php echo $active?'border-primary text-primary':'border-transparent text-gray-600 hover:text-primary hover:border-primary'; ?>">
-              <?php echo htmlspecialchars($cat['name']); ?>
-            </a>
-          <?php endforeach; ?>
-        </nav>
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div class="border-b border-gray-200 w-full sm:w-auto">
+          <nav class="-mb-px flex flex-wrap gap-2" aria-label="Tabs">
+            <?php foreach ($categories as $cat): $cid=(int)$cat['id']; $active=$cid===$currentTab; ?>
+              <a href="?tab=<?php echo $cid; ?>" class="px-4 py-2 border-b-2 <?php echo $active?'border-primary text-primary':'border-transparent text-gray-600 hover:text-primary hover:border-primary'; ?>">
+                <?php echo htmlspecialchars($cat['name']); ?>
+              </a>
+            <?php endforeach; ?>
+          </nav>
+        </div>
+        <div class="w-full sm:w-64">
+          <div class="relative">
+            <input type="text" id="violationSearch" placeholder="Search violations..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <i class="fas fa-search text-gray-400"></i>
+            </div>
+          </div>
+        </div>
       </div>
       <?php foreach ($categories as $cat): $cid=(int)$cat['id']; if ($cid !== $currentTab) continue; ?>
         <div id="categoryPanel_<?php echo $cid; ?>" class="space-y-3">
           <div class="text-sm text-gray-600">Category: <span class="font-medium"><?php echo htmlspecialchars($cat['name']); ?></span> — <?php echo htmlspecialchars($cat['description'] ?? ''); ?></div>
 
           <div id="tableWrap_<?php echo $cid; ?>" class="overflow-x-auto bg-white border border-gray-200 rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200" id="violationsTable_<?php echo $cid; ?>">
+            <table class="min-w-full divide-y divide-gray-200 violations-table" id="violationsTable_<?php echo $cid; ?>" data-category="<?php echo $cid; ?>">
               <thead class="bg-gray-50">
                 <tr>
                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Violation / Offense</th>
@@ -365,6 +375,39 @@
   });
 
   // Client-side PDF export using jsPDF + html2canvas
+  // Search functionality
+  document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('violationSearch');
+    
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const currentTable = document.querySelector(`#violationsTable_${document.querySelector('[id^="categoryPanel_"]:not([hidden])')?.id.split('_')[1]}`);
+        
+        if (!currentTable) return;
+        
+        const rows = currentTable.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+          if (!searchTerm) {
+            row.style.display = '';
+            return;
+          }
+          
+          const name = row.cells[0]?.textContent?.toLowerCase() || '';
+          const code = row.cells[0]?.querySelector('.text-xs')?.textContent?.toLowerCase() || '';
+          const description = row.cells[0]?.querySelector('.text-xs')?.textContent?.toLowerCase() || '';
+          
+          if (name.includes(searchTerm) || code.includes(searchTerm) || description.includes(searchTerm)) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+
   async function exportCurrentTabToPdf() {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');

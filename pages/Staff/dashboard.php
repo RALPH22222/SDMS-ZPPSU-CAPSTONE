@@ -95,6 +95,16 @@
     if ((int)$row['status_id'] === 4) { $metrics['resolved'] += (int)$row['c']; }
     if ((int)$row['status_id'] === 6) { $metrics['rejected'] += (int)$row['c']; }
   }
+  // Get notification count for the current user
+  $notificationCount = 0;
+  try {
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0');
+    $stmt->execute([$currentUserId]);
+    $notificationCount = (int)$stmt->fetchColumn();
+  } catch (PDOException $e) {
+    error_log('Error fetching notification count: ' . $e->getMessage());
+  }
+
   $cases = $pdo->prepare('SELECT c.id, c.case_number, c.title, c.incident_date, c.status_id, ct.name as status_name, s.first_name, s.last_name, vt.name as violation_name
                           FROM cases c
                           LEFT JOIN case_status ct ON ct.id = c.status_id
@@ -157,7 +167,39 @@
   <?php include '../../components/staff-sidebar.php'; ?>
 
   <main class="flex-1 md:ml-64">
-    <!-- Top bar -->
+    <!-- Mobile Header -->
+    <div class="md:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+      <div class="h-16 flex items-center px-4">
+        <button id="staffSidebarToggle" class="text-primary text-2xl mr-3">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="text-primary font-bold flex-grow">Staff Dashboard</div>
+        <a href="notifications.php" class="relative text-primary text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+          <i class="fa-solid fa-bell"></i>
+          <?php if ($notificationCount > 0): ?>
+            <span class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+              <?php echo $notificationCount > 9 ? '9+' : $notificationCount; ?>
+            </span>
+          <?php endif; ?>
+        </a>
+      </div>
+    </div>
+
+    <!-- Desktop Header -->
+    <div class="hidden md:flex sticky top-0 z-40 bg-white border-b border-gray-200 h-16 items-center px-6 justify-between">
+      <h1 class="text-xl font-bold text-primary">Dashboard</h1>
+      <div class="flex items-center space-x-4">
+        <a href="notifications.php" class="relative text-primary text-2xl p-2 hover:bg-gray-100 rounded-full transition-colors duration-200">
+          <i class="fa-solid fa-bell"></i>
+          <?php if ($notificationCount > 0): ?>
+            <span class="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow-sm">
+              <?php echo $notificationCount > 9 ? '9+' : $notificationCount; ?>
+            </span>
+          <?php endif; ?>
+        </a>
+      </div>
+    </div>
+    <!-- End Top bar -->
     <div class="h-16 flex items-center justify-between px-4 md:px-6 lg:px-8 border-b border-gray-200 bg-white sticky top-0 z-40">
       <div class="flex items-center gap-3">
         <button id="staffSidebarToggle" class="md:hidden text-primary text-xl focus:outline-none" aria-label="Toggle Sidebar">

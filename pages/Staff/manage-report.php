@@ -1,5 +1,4 @@
 <?php
-  // Staff: Manage Reports (create, view, edit, delete cases reported by this staff)
   if (session_status() === PHP_SESSION_NONE) {
     session_start();
   }
@@ -7,8 +6,6 @@
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
   }
   $csrf = $_SESSION['csrf_token'];
-
-  // Basic auth guard (adjust based on your auth implementation)
   if (!isset($_SESSION['user_id'])) {
     header('Location: ../Auth/login.php');
     exit;
@@ -26,10 +23,8 @@
     if ($row && !empty($row['id'])) { $currentStaffId = (int)$row['id']; }
   } catch (Throwable $e) { /* ignore */ }
 
-  // Helper: sanitize output
   function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
-  // Flash helper
   $flash = ['type' => null, 'msg' => null];
   if (!empty($_SESSION['flash']) && is_array($_SESSION['flash'])) {
     $flash = $_SESSION['flash'];
@@ -41,8 +36,6 @@
       throw new Exception('Invalid CSRF token.');
     }
   }
-
-  // Reference lists
   $students = [];
   $violationTypes = [];
   $caseStatuses = [];
@@ -55,21 +48,16 @@
   try {
     $caseStatuses = $pdo->query("SELECT id, name FROM case_status ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
   } catch (Throwable $e) { $caseStatuses = []; }
-
-  // Helper: generate unique case number
   function generate_case_number(PDO $pdo) {
     for ($i = 0; $i < 5; $i++) {
       $candidate = 'CASE-' . date('Ymd-His') . '-' . random_int(100, 999);
       $chk = $pdo->prepare('SELECT 1 FROM cases WHERE case_number = ? LIMIT 1');
       $chk->execute([$candidate]);
       if (!$chk->fetchColumn()) { return $candidate; }
-      usleep(100000); // 100ms to avoid collisions on fast loops
+      usleep(100000); 
     }
-    // Fallback
     return 'CASE-' . date('Ymd-His') . '-' . bin2hex(random_bytes(2));
   }
-
-  // POST actions: create, update, delete
   try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ensure_csrf();
@@ -81,13 +69,11 @@
         $title = trim($_POST['title'] ?? '');
         $description = trim($_POST['description'] ?? '') ?: null;
         $location = trim($_POST['location'] ?? '') ?: null;
-        $incident_date = trim($_POST['incident_date'] ?? ''); // expects datetime-local (YYYY-MM-DDTHH:MM)
+        $incident_date = trim($_POST['incident_date'] ?? ''); 
         $is_confidential = isset($_POST['is_confidential']) ? 1 : 0;
-
         if ($student_id <= 0 || $violation_type_id <= 0 || $title === '' || $incident_date === '') {
           throw new Exception('Please complete all required fields.');
         }
-        // Normalize datetime-local to MySQL format
         $incident_dt = str_replace('T', ' ', $incident_date);
 
         $case_number = generate_case_number($pdo);
@@ -95,42 +81,29 @@
         $stmt = $pdo->prepare('INSERT INTO cases (id, case_number, student_id, reported_by_staff_id, violation_type_id, title, description, location, incident_date, status_id, resolution, resolution_date, is_confidential, created_at, updated_at) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, NULL, ?, CURRENT_TIMESTAMP(), NULL)');
         $stmt->execute([$case_number, $student_id, ($currentStaffId ?? $currentUserId), $violation_type_id, $title, $description, $location, $incident_dt, $is_confidential]);
         $caseId = $pdo->lastInsertId();
-
-        // Send notification to the student
         try {
-            // Get student's user ID
             $stmt = $pdo->prepare('SELECT user_id FROM students WHERE id = ?');
             $stmt->execute([$student_id]);
             $studentUserId = $stmt->fetchColumn();
             
             if ($studentUserId) {
-                // Include notification functions
                 require_once __DIR__ . '/../../includes/notification_functions.php';
-                
-                // Prepare notification message
                 $message = "A new report has been filed against you: {$title}";
-                
-                // Send notification (method_id 1 is for system notifications)
                 sendNotification($studentUserId, $message, 1, $caseId);
             }
         } catch (Exception $e) {
-            // Log error but don't interrupt the flow
             error_log("Failed to send notification to student: " . $e->getMessage());
         }
-
-        // Send notification to admins
         require_once __DIR__ . '/../../includes/notification_functions.php';
         $adminIds = getAdminRecipients();
         if (!empty($adminIds)) {
             $message = "New case #$case_number reported: $title";
             sendNotification($adminIds, $message, 1, $caseId);
         }
-
         $_SESSION['flash'] = flash('success', 'Report created successfully.');
         header('Location: ' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($_GET));
         exit;
       }
-
       if ($action === 'update_report') {
         $case_id = (int)($_POST['case_id'] ?? 0);
         $student_id = (int)($_POST['student_id'] ?? 0);
@@ -141,13 +114,10 @@
         $incident_date = trim($_POST['incident_date'] ?? '');
         $status_id = isset($_POST['status_id']) && ctype_digit((string)$_POST['status_id']) ? (int)$_POST['status_id'] : null;
         $is_confidential = isset($_POST['is_confidential']) ? 1 : 0;
-
         if ($case_id <= 0) { throw new Exception('Invalid case.'); }
         if ($student_id <= 0 || $violation_type_id <= 0 || $title === '' || $incident_date === '') {
           throw new Exception('Please complete all required fields.');
         }
-
-        // Verify ownership
         $own = $pdo->prepare('SELECT reported_by_staff_id FROM cases WHERE id = ?');
         $own->execute([$case_id]);
         $rep = $own->fetchColumn();
@@ -155,30 +125,20 @@
         if (!in_array((int)$rep, [ (int)($currentStaffId ?? 0), $currentUserId ], true)) {
           throw new Exception('You are not allowed to edit this case.');
         }
-
         $incident_dt = str_replace('T', ' ', $incident_date);
-
         $sql = 'UPDATE cases SET student_id = ?, violation_type_id = ?, title = ?, description = ?, location = ?, incident_date = ?, is_confidential = ?';
         $params = [$student_id, $violation_type_id, $title, $description, $location, $incident_dt, $is_confidential];
         if ($status_id !== null) { $sql .= ', status_id = ?'; $params[] = $status_id; }
         $sql .= ' WHERE id = ?';
         $params[] = $case_id;
-
         $upd = $pdo->prepare($sql);
         $upd->execute($params);
-
-        // Send notification to the student about the update
         try {
-            // Get student's user ID
             $stmt = $pdo->prepare('SELECT user_id FROM students WHERE id = ?');
             $stmt->execute([$student_id]);
             $studentUserId = $stmt->fetchColumn();
-            
             if ($studentUserId) {
-                // Include notification functions if not already included
                 require_once __DIR__ . '/../../includes/notification_functions.php';
-                
-                // Prepare notification message
                 $statusText = '';
                 if ($status_id !== null) {
                     $stmt = $pdo->prepare('SELECT name FROM case_status WHERE id = ?');
@@ -186,27 +146,19 @@
                     $statusName = $stmt->fetchColumn();
                     $statusText = ", Status: " . ($statusName ?: 'Updated');
                 }
-                
                 $message = "Your report has been updated: {$title}{$statusText}";
-                
-                // Send notification (method_id 1 is for system notifications)
                 sendNotification($studentUserId, $message, 1, $case_id);
             }
         } catch (Exception $e) {
-            // Log error but don't interrupt the flow
             error_log("Failed to send update notification to student: " . $e->getMessage());
         }
-
         $_SESSION['flash'] = flash('success', 'Report updated successfully.');
         header('Location: ' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($_GET));
         exit;
       }
-
       if ($action === 'delete_report') {
         $case_id = (int)($_POST['case_id'] ?? 0);
         if ($case_id <= 0) { throw new Exception('Invalid case.'); }
-
-        // Verify ownership
         $own = $pdo->prepare('SELECT reported_by_staff_id FROM cases WHERE id = ?');
         $own->execute([$case_id]);
         $rep = $own->fetchColumn();
@@ -214,10 +166,8 @@
         if (!in_array((int)$rep, [ (int)($currentStaffId ?? 0), $currentUserId ], true)) {
           throw new Exception('You are not allowed to delete this case.');
         }
-
         $del = $pdo->prepare('DELETE FROM cases WHERE id = ?');
         $del->execute([$case_id]);
-
         $_SESSION['flash'] = flash('success', 'Report deleted successfully.');
         header('Location: ' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($_GET));
         exit;
@@ -228,20 +178,15 @@
     header('Location: ' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($_GET));
     exit;
   }
-
-  // Filters (GET)
   $q = trim($_GET['q'] ?? '');
   $statusFilter = trim($_GET['status'] ?? '');
   $date_from = trim($_GET['date_from'] ?? '');
   $date_to = trim($_GET['date_to'] ?? '');
-
-  // Build base query: show cases reported by this staff (by staff.id or by user_id for legacy)
   $params = [];
   $where = [];
   $where[] = '(c.reported_by_staff_id = ? OR c.reported_by_staff_id = ?)';
   $params[] = $currentStaffId;
   $params[] = $currentUserId;
-
   if ($q !== '') {
     $where[] = '(c.case_number LIKE ? OR c.title LIKE ? OR s.first_name LIKE ? OR s.last_name LIKE ? OR vt.name LIKE ?)';
     $like = "%" . $q . "%";
@@ -253,10 +198,7 @@
   }
   if ($date_from !== '') { $where[] = 'DATE(c.incident_date) >= ?'; $params[] = $date_from; }
   if ($date_to !== '') { $where[] = 'DATE(c.incident_date) <= ?'; $params[] = $date_to; }
-
   $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
-
-  // Fetch cases
   $cases = [];
   try {
     $sql = "SELECT 
@@ -282,16 +224,12 @@
   } catch (Throwable $e) {
     $cases = [];
   }
-
   $pageTitle = 'Manage Reports - Staff - SDMS';
   include __DIR__ . '/../../components/staff-head.php';
 ?>
-
 <div class="min-h-screen flex">
   <?php include __DIR__ . '/../../components/staff-sidebar.php'; ?>
-
   <main class="flex-1 ml-0 md:ml-64">
-    <!-- Top bar -->
     <div class="h-16 flex items-center justify-between px-4 md:px-8 border-b border-gray-200 bg-white sticky top-0 z-40">
       <div class="flex items-center gap-3">
         <button id="staffSidebarToggle" class="md:hidden text-primary text-xl" aria-label="Toggle Sidebar">
@@ -303,7 +241,6 @@
         Logged in as: <span class="font-medium text-dark"><?php echo e($_SESSION['email'] ?? $_SESSION['username'] ?? 'Staff'); ?></span>
       </div>
     </div>
-
     <div class="p-4 md:p-8 space-y-6">
       <!-- Flash -->
       <?php if ($flash['type']): ?>
@@ -311,8 +248,6 @@
              data-type="<?php echo $flash['type']==='success'?'success':'error'; ?>"
              data-msg='<?php echo json_encode($flash["msg"]); ?>'></div>
       <?php endif; ?>
-
-      <!-- Filters & New -->
       <div class="bg-white border rounded-lg p-4">
         <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div class="md:col-span-2">
@@ -356,13 +291,10 @@
           </div>
         </form>
       </div>
-
-      <!-- Reports List -->
       <section class="bg-white border rounded-lg overflow-hidden">
         <div class="flex items-center justify-between p-4 border-b">
           <h2 class="text-lg font-semibold">My Reports (<?php echo count($cases); ?>)</h2>
         </div>
-
         <?php if (empty($cases)): ?>
           <div class="p-6 text-gray-500">No reports found.</div>
         <?php else: ?>
@@ -437,8 +369,6 @@
     </div>
   </main>
 </div>
-
-<!-- Create Modal -->
 <div id="createModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
   <div class="bg-white w-full max-w-2xl rounded-lg shadow-lg p-6">
     <div class="flex items-center justify-between mb-4">
@@ -497,8 +427,6 @@
     </form>
   </div>
 </div>
-
-<!-- Edit Modal -->
 <div id="editModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
   <div class="bg-white w-full max-w-2xl rounded-lg shadow-lg p-6">
     <div class="flex items-center justify-between mb-4">
@@ -509,7 +437,6 @@
       <input type="hidden" name="csrf" value="<?php echo $csrf; ?>" />
       <input type="hidden" name="action" value="update_report" />
       <input type="hidden" name="case_id" id="edit_case_id" value="" />
-
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium mb-1">Student<span class="text-rose-600">*</span></label>
@@ -567,9 +494,7 @@
     </form>
   </div>
 </div>
-
 <script>
-  // Flash via SweetAlert2
   document.addEventListener('DOMContentLoaded', () => {
     const flash = document.getElementById('flashData');
     if (flash && window.Swal) {
@@ -578,8 +503,6 @@
       Swal.fire({ icon: type, title: type === 'success' ? 'Success' : 'Error', text: msg });
     }
   });
-
-  // Modal helpers
   const createModal = document.getElementById('createModal');
   const editModal = document.getElementById('editModal');
   function show(el){ el.classList.remove('hidden'); el.classList.add('flex'); }

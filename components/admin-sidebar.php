@@ -57,9 +57,9 @@
         </a>
       </li>
       <li>
-        <a href="manage-notification.php" class="flex items-center gap-3 px-4 py-3 <?php echo isActive('manage-notification.php', $current); ?>">
-          <i class="fa-solid fa-bell w-5"></i>
-          <span class="font-medium">Notifications</span>
+        <a href="manage-department.php" class="flex items-center gap-3 px-4 py-3 <?php echo isActive('manage-department.php', $current); ?>">
+          <i class="fa-solid fa-building w-5"></i>
+          <span class="font-medium">Manage Departments</span>
         </a>
       </li>
       <li>

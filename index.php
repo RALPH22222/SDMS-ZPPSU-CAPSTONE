@@ -121,7 +121,7 @@
                     <i class="fas fa-database"></i>
                 </div>
                 <h3 class="text-xl font-bold text-primary mb-4">Centralized Case Records</h3>
-                <p class="text-gray-600">Track academic and behavioral violations in one secure place with easy access for authorized personnel.</p>
+                <p class="text-gray-600">Track behavioral violations in one secure place with easy access for authorized personnel.</p>
             </div>
             <div class="bg-white p-8 rounded-lg shadow-md hover:shadow-lg transition-shadow text-center border-t-4 border-primary">
                 <div class="text-primary text-4xl mb-6">
@@ -411,7 +411,6 @@
 <button id="scrollToTop" class="fixed bottom-8 right-8 bg-primary text-white p-3 rounded-full shadow-lg opacity-0 invisible transition-all duration-300 transform hover:scale-110 hover:bg-primary-dark z-50">
     <i class="fas fa-arrow-up"></i>
 </button>
-
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 <script src="src/js/main.js"></script>
 <script>

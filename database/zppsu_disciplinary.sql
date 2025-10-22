@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 02, 2025 at 05:59 AM
+-- Generation Time: Oct 21, 2025 at 07:12 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -40,6 +40,14 @@ CREATE TABLE `appeals` (
   `decision_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `appeals`
+--
+
+INSERT INTO `appeals` (`id`, `case_id`, `student_id`, `appeal_text`, `attachment_evidence_id`, `status_id`, `submitted_at`, `reviewed_by_user_id`, `decision_text`, `decision_at`) VALUES
+(1, 7, 10, 'ters', NULL, 1, '2025-10-17 23:12:26', NULL, NULL, NULL),
+(2, 8, 10, 'twest', NULL, 1, '2025-10-18 01:17:52', NULL, NULL, NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -62,39 +70,36 @@ CREATE TABLE `audit_trail` (
 --
 
 INSERT INTO `audit_trail` (`id`, `table_name`, `record_id`, `action`, `performed_by_user_id`, `old_values`, `new_values`, `created_at`) VALUES
-(1, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-23 20:17:40'),
-(2, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-23 20:24:27'),
-(3, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-23 21:14:28'),
-(4, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-23 22:07:47'),
-(5, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-24 04:48:14'),
-(6, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-24 04:48:50'),
-(7, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-24 04:49:19'),
-(8, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-24 04:52:58'),
-(9, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-24 04:59:30'),
-(10, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-24 06:20:42'),
-(11, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-24 06:22:03'),
-(12, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-24 06:22:27'),
-(13, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 03:12:09'),
-(14, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-25 03:13:33'),
-(15, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 04:20:40'),
-(16, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 08:33:48'),
-(17, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-25 09:38:26'),
-(18, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-25 16:41:39'),
-(19, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-25 20:12:16'),
-(20, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-25 20:16:21'),
-(21, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-25 20:17:13'),
-(22, 'auth', '12', 'LOGOUT', 12, NULL, NULL, '2025-09-25 20:17:34'),
-(23, 'auth', '14', 'LOGOUT', 14, NULL, NULL, '2025-09-26 13:55:51'),
-(24, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-09-26 13:58:17'),
-(25, 'users', '19', 'CREATE', 19, NULL, '{\"username\":\"ralphmonzales665@gmail.com\",\"email\":\"ralphmonzales665@gmail.com\",\"role_id\":4}', '2025-09-27 21:01:54'),
-(26, 'parent_student', '19-2', 'LINK', 19, NULL, '{\"parent_user_id\":19,\"student_id\":2,\"relationship\":\"Mother\"}', '2025-09-27 21:01:54'),
-(27, 'auth', '19', 'LOGOUT', 19, NULL, NULL, '2025-09-27 22:16:24'),
-(28, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-28 06:43:35'),
-(29, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-28 11:58:31'),
-(30, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-28 21:30:04'),
-(31, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-09-30 13:29:19'),
-(32, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-10-02 00:28:46'),
-(33, 'auth', '3', 'LOGOUT', 3, NULL, NULL, '2025-10-02 00:38:12');
+(1, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-10 20:13:33'),
+(2, 'auth', '17', 'LOGOUT', 17, NULL, NULL, '2025-10-10 20:14:07'),
+(3, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-17 21:22:18'),
+(4, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-17 21:27:54'),
+(5, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-17 23:10:39'),
+(6, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-10-17 23:12:30'),
+(7, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-17 23:26:22'),
+(8, 'auth', '13', 'LOGOUT', 13, NULL, NULL, '2025-10-18 01:18:19'),
+(9, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-18 01:41:27'),
+(10, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-18 02:06:25'),
+(11, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-18 03:59:47'),
+(12, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-18 04:00:35'),
+(13, 'auth', '7', 'LOGOUT', 7, NULL, NULL, '2025-10-18 04:01:17'),
+(14, 'auth', '17', 'LOGOUT', 17, NULL, NULL, '2025-10-18 04:02:04'),
+(15, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-18 04:02:46'),
+(16, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-18 04:09:17'),
+(17, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-18 04:44:09'),
+(18, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-18 05:03:19'),
+(19, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-21 14:05:11'),
+(20, 'auth', '9', 'LOGOUT', 9, NULL, NULL, '2025-10-21 14:06:34'),
+(21, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-21 14:07:16'),
+(22, 'auth', '19', 'LOGOUT', 19, NULL, NULL, '2025-10-21 14:10:22'),
+(23, 'auth', '9', 'LOGOUT', 9, NULL, NULL, '2025-10-21 14:20:05'),
+(24, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-21 14:24:49'),
+(25, 'users', '26', 'CREATE', 26, NULL, '{\"username\":\"parent@gmail.com\",\"email\":\"parent@gmail.com\",\"role_id\":4}', '2025-10-21 14:29:53'),
+(26, 'parent_student', '26-1', 'LINK', 26, NULL, '{\"parent_user_id\":26,\"student_id\":1,\"relationship\":\"Mother\"}', '2025-10-21 14:29:53'),
+(27, 'auth', '26', 'LOGOUT', 26, NULL, NULL, '2025-10-21 14:30:02'),
+(28, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-21 14:30:54'),
+(29, 'auth', '1', 'LOGOUT', 1, NULL, NULL, '2025-10-21 14:32:59'),
+(30, 'auth', '2', 'LOGOUT', 2, NULL, NULL, '2025-10-21 14:38:13');
 
 -- --------------------------------------------------------
 
@@ -125,7 +130,19 @@ CREATE TABLE `cases` (
 --
 
 INSERT INTO `cases` (`id`, `case_number`, `student_id`, `reported_by_staff_id`, `violation_type_id`, `title`, `description`, `location`, `incident_date`, `status_id`, `resolution`, `resolution_date`, `is_confidential`, `created_at`, `updated_at`) VALUES
-(8, 'CASE-20250928-140644-538', 5, 1, 19, 'test', 'test', 'test', '2025-09-27 20:06:00', 4, 'test resolve', '2025-10-02 08:37:56', 0, '2025-09-28 12:06:44', '2025-10-02 00:37:56');
+(1, 'CASE-20251017-232244-364', 10, 1, 20, 'terst', NULL, NULL, '2025-10-16 05:22:00', 1, NULL, NULL, 0, '2025-10-17 21:22:44', NULL),
+(7, 'CASE-20251017-232749-507', 10, 1, 19, 'testuu', NULL, NULL, '2025-10-18 05:27:00', 5, NULL, NULL, 0, '2025-10-17 21:27:49', '2025-10-17 23:12:26'),
+(8, 'CASE-20251018-012842-818', 10, 1, 19, 'test', 'test', NULL, '2025-10-18 07:28:00', 5, NULL, NULL, 0, '2025-10-17 23:28:42', '2025-10-18 01:17:52'),
+(9, 'CASE-20251018-012916-122', 7, 1, 22, 'test', 'test', NULL, '2025-10-18 07:29:00', 1, NULL, NULL, 0, '2025-10-17 23:29:16', NULL),
+(10, 'CASE-20251018-060028-580', 4, 1, 29, 'test', 'test', NULL, '2025-10-18 12:00:00', 1, NULL, NULL, 0, '2025-10-18 04:00:28', NULL),
+(11, 'CASE-20251018-060242-107', 4, 1, 20, 'test', 'test', NULL, '2025-10-18 12:02:00', 1, NULL, NULL, 0, '2025-10-18 04:02:42', NULL),
+(12, 'CASE-20251018-060914-826', 4, 1, 19, 'test', 'twst', NULL, '2025-10-18 12:09:00', 1, NULL, NULL, 0, '2025-10-18 04:09:14', NULL),
+(13, 'CASE-20251018-064344-528', 4, 1, 23, 'ttest-parenmtr', NULL, NULL, '2025-10-18 12:43:00', 1, NULL, NULL, 0, '2025-10-18 04:43:44', NULL),
+(14, 'CASE-20251018-064405-512', 4, 1, 21, 'testparent-s', NULL, NULL, '2025-10-18 12:44:00', 1, NULL, NULL, 0, '2025-10-18 04:44:05', NULL),
+(15, 'CASE-20251018-064933-509', 4, 1, 19, 'test', NULL, NULL, '2025-10-18 12:49:00', 1, NULL, NULL, 0, '2025-10-18 04:49:33', NULL),
+(16, 'CASE-20251018-070239-356', 4, 1, 21, 'test', NULL, NULL, '2025-10-18 13:02:00', 1, NULL, NULL, 0, '2025-10-18 05:02:39', NULL),
+(21, 'CASE-20251018-075955-921', 4, 1, 19, 'test', NULL, NULL, '2025-10-18 13:58:00', 1, NULL, NULL, 0, '2025-10-18 05:59:55', NULL),
+(22, 'CASE-20251018-080030-601', 4, 1, 18, 'llll', NULL, NULL, '2025-10-18 14:00:00', 1, NULL, NULL, 0, '2025-10-18 06:00:30', NULL);
 
 -- --------------------------------------------------------
 
@@ -166,7 +183,8 @@ CREATE TABLE `case_logs` (
 --
 
 INSERT INTO `case_logs` (`id`, `case_id`, `performed_by_user_id`, `action`, `from_value`, `to_value`, `note`, `created_at`) VALUES
-(9, 8, NULL, 'Status Change', '1', '4', 'test resolve', '2025-10-02 00:37:56');
+(1, 7, 13, 'APPEAL_SUBMITTED', '1', '5', 'Appeal ID #1', '2025-10-17 23:12:26'),
+(2, 8, 13, 'APPEAL_SUBMITTED', '1', '5', 'Appeal ID #2', '2025-10-18 01:17:52');
 
 -- --------------------------------------------------------
 
@@ -211,8 +229,35 @@ CREATE TABLE `classes` (
 --
 
 INSERT INTO `classes` (`id`, `class_name`, `adviser_staff_id`, `created_at`) VALUES
-(2, 'BSIT-4A!', 1, '2025-09-23 21:04:53'),
-(3, 'BSIT-4B', 1, '2025-09-23 21:08:34');
+(1, 'BSIT-4A', 1, '2025-10-10 19:58:09'),
+(2, 'BSIT-4B', 2, '2025-10-10 19:58:09');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `courses`
+--
+
+CREATE TABLE `courses` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `course_name` varchar(150) NOT NULL,
+  `course_code` varchar(50) DEFAULT NULL,
+  `department_id` bigint(20) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `departments`
+--
+
+CREATE TABLE `departments` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `department_name` varchar(150) NOT NULL,
+  `abbreviation` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -236,20 +281,7 @@ CREATE TABLE `messages` (
 --
 
 INSERT INTO `messages` (`id`, `case_id`, `sender_user_id`, `recipient_user_id`, `subject`, `body`, `is_read`, `created_at`) VALUES
-(27, NULL, 3, 1, NULL, 'test edit', 0, '2025-09-23 19:53:03'),
-(28, NULL, 3, 1, NULL, 'test', 0, '2025-09-23 19:53:03'),
-(29, NULL, 3, 1, NULL, 'test', 0, '2025-09-23 19:53:09'),
-(31, NULL, 3, 1, NULL, 'test for double message', 0, '2025-09-23 19:54:46'),
-(32, NULL, 3, 1, NULL, 'test for double message', 0, '2025-09-23 19:54:46'),
-(35, NULL, 3, 1, NULL, 'w', 0, '2025-09-23 19:55:25'),
-(38, NULL, 3, 1, NULL, 'w', 0, '2025-09-23 19:55:25'),
-(41, NULL, 14, 1, NULL, 'test', 0, '2025-09-23 21:57:25'),
-(43, NULL, 13, 12, NULL, 'edit', 1, '2025-09-25 04:00:36'),
-(52, NULL, 14, 12, NULL, 'test', 1, '2025-09-25 20:17:09'),
-(53, NULL, 14, 18, NULL, 'tezst-edit', 0, '2025-09-26 13:55:28'),
-(54, NULL, 13, 14, NULL, 'tezst', 1, '2025-09-26 15:45:41'),
-(55, NULL, 14, 13, NULL, 'test', 1, '2025-09-26 15:45:58'),
-(56, NULL, 3, 12, NULL, 'test-edit', 0, '2025-09-28 11:54:50');
+(1, NULL, 1, 16, NULL, 'test for double message', 0, '2025-10-21 13:59:48');
 
 -- --------------------------------------------------------
 
@@ -272,12 +304,30 @@ CREATE TABLE `notifications` (
 --
 
 INSERT INTO `notifications` (`id`, `user_id`, `case_id`, `message`, `method_id`, `is_read`, `created_at`) VALUES
-(2, 13, NULL, 'New appeal submitted for case #22', 1, 0, '2025-09-25 09:39:07'),
-(3, 13, NULL, 'New appeal submitted for case #CASE-20250925-035516-829', 1, 0, '2025-09-25 15:10:26'),
-(4, 13, NULL, 'New appeal submitted for case #111', 1, 0, '2025-09-25 15:16:00'),
-(5, 13, NULL, 'New appeal submitted for case #CASE-20250925-221536-119', 1, 0, '2025-09-25 20:16:59'),
-(6, 13, NULL, 'New appeal submitted for case #111', 1, 0, '2025-09-26 13:55:10'),
-(7, 13, NULL, 'New appeal submitted for case #123', 1, 0, '2025-09-26 13:58:40');
+(1, 1, 1, 'New case #CASE-20251017-232244-364 reported: terst', 1, 1, '2025-10-17 21:22:44'),
+(5, 1, 7, 'New case #CASE-20251017-232749-507 filed for Daniel Flores - Obscene/Vulgar Language: testuu', 1, 1, '2025-10-17 21:27:49'),
+(6, 2, 7, 'New appeal submitted for case #CASE-20251017-232749-507', 1, 0, '2025-10-17 23:12:26'),
+(7, 1, 8, 'New case #CASE-20251018-012842-818 reported: test', 1, 1, '2025-10-17 23:28:42'),
+(9, 2, 8, 'New appeal submitted for case #CASE-20251018-012842-818', 1, 0, '2025-10-18 01:17:52'),
+(10, 7, 10, 'A new report has been filed against you: test', 1, 0, '2025-10-18 04:00:28'),
+(11, 1, 10, 'New case #CASE-20251018-060028-580 reported: test', 1, 0, '2025-10-18 04:00:28'),
+(12, 1, 11, 'New case #CASE-20251018-060242-107 filed for Miguel Garcia - Gambling/Betting: test', 1, 0, '2025-10-18 04:02:42'),
+(13, 1, 12, 'New case #CASE-20251018-060914-826 filed for Miguel Garcia - Obscene/Vulgar Language: test', 1, 0, '2025-10-18 04:09:14'),
+(14, 7, 12, 'A disciplinary report has been filed against you: test (Case #CASE-20251018-060914-826)', 1, 0, '2025-10-18 04:09:14'),
+(15, 7, 13, 'A new report has been filed against you: ttest-parenmtr', 1, 0, '2025-10-18 04:43:44'),
+(16, 1, 13, 'New case #CASE-20251018-064344-528 reported: ttest-parenmtr', 1, 0, '2025-10-18 04:43:44'),
+(17, 1, 14, 'New case #CASE-20251018-064405-512 filed for Miguel Garcia - Scamming/Fraud/Extortion: testparent-s', 1, 0, '2025-10-18 04:44:05'),
+(18, 7, 14, 'A disciplinary report has been filed against you: testparent-s (Case #CASE-20251018-064405-512)', 1, 0, '2025-10-18 04:44:05'),
+(19, 7, 15, 'A new report has been filed against you: test', 1, 0, '2025-10-18 04:49:33'),
+(20, 1, 15, 'New case #CASE-20251018-064933-509 reported: test', 1, 0, '2025-10-18 04:49:33'),
+(21, 7, 16, 'A new report has been filed against you: test', 1, 0, '2025-10-18 05:02:39'),
+(22, 1, 16, 'New case #CASE-20251018-070239-356 reported: test', 1, 0, '2025-10-18 05:02:39'),
+(23, 1, 21, 'New case #CASE-20251018-075955-921 filed for Miguel Garcia - Obscene/Vulgar Language: test', 1, 0, '2025-10-18 05:59:55'),
+(24, 7, 21, 'A new case has been filed against you: test', 1, 0, '2025-10-18 05:59:55'),
+(25, 17, 21, 'A new case has been filed for your child Miguel Garcia: test', 1, 0, '2025-10-18 05:59:55'),
+(26, 1, 22, 'New case #CASE-20251018-080030-601 filed for Miguel Garcia - Cheating on Exams/Quizzes: llll', 1, 0, '2025-10-18 06:00:30'),
+(27, 7, 22, 'A new case has been filed against you: llll', 1, 0, '2025-10-18 06:00:30'),
+(28, 17, 22, 'A new case has been filed for your child Miguel Garcia: llll', 1, 0, '2025-10-18 06:00:30');
 
 -- --------------------------------------------------------
 
@@ -310,6 +360,23 @@ CREATE TABLE `parent_student` (
   `relationship` varchar(50) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `parent_student`
+--
+
+INSERT INTO `parent_student` (`id`, `parent_user_id`, `student_id`, `relationship`, `created_at`) VALUES
+(1, 14, 1, 'Mother', '2025-10-10 19:58:09'),
+(2, 15, 2, 'Father', '2025-10-10 19:58:09'),
+(3, 16, 3, 'Mother', '2025-10-10 19:58:09'),
+(4, 17, 4, 'Father', '2025-10-10 19:58:09'),
+(5, 18, 5, 'Mother', '2025-10-10 19:58:09'),
+(6, 19, 6, 'Father', '2025-10-10 19:58:09'),
+(7, 20, 7, 'Mother', '2025-10-10 19:58:09'),
+(8, 21, 8, 'Father', '2025-10-10 19:58:09'),
+(9, 22, 9, 'Mother', '2025-10-10 19:58:09'),
+(10, 23, 10, 'Father', '2025-10-10 19:58:09'),
+(11, 26, 1, 'Mother', '2025-10-21 14:29:53');
 
 -- --------------------------------------------------------
 
@@ -360,7 +427,8 @@ CREATE TABLE `staff` (
 --
 
 INSERT INTO `staff` (`id`, `staff_number`, `user_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `department`, `position`, `created_at`, `updated_at`) VALUES
-(1, 'ZPPSU-TCH-2024', 13, 'Maria', 'Reyes', 'Santos', NULL, 'College of Information Technology', 'Faculty Adviser', '2025-09-23 21:08:34', NULL);
+(1, 'ZPPSU-TCH-2024-001', 2, 'Maria', 'Reyes', 'Santos', NULL, 'College of Information Technology', 'Faculty Adviser', '2025-10-10 19:58:09', NULL),
+(2, 'ZPPSU-TCH-2024-002', 3, 'Juan', 'Dela', 'Cruz', NULL, 'College of Information Technology', 'Faculty Adviser', '2025-10-10 19:58:09', NULL);
 
 -- --------------------------------------------------------
 
@@ -379,6 +447,7 @@ CREATE TABLE `students` (
   `birthdate` date DEFAULT NULL,
   `address` text DEFAULT NULL,
   `class_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `course_id` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT NULL ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -387,8 +456,17 @@ CREATE TABLE `students` (
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`id`, `student_number`, `user_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `birthdate`, `address`, `class_id`, `created_at`, `updated_at`) VALUES
-(5, '123', 12, 'Test', 't', 'Test', 'jr', '2015-09-15', 'Test', 2, '2025-09-28 06:27:11', '2025-09-28 07:05:32');
+INSERT INTO `students` (`id`, `student_number`, `user_id`, `first_name`, `middle_name`, `last_name`, `suffix`, `birthdate`, `address`, `class_id`, `course_id`, `created_at`, `updated_at`) VALUES
+(1, '25-0001', 4, 'Anna', 'M', 'Reyes', NULL, '2003-05-15', '123 Main Street, Zamboanga City', 1, NULL, '2025-10-10 19:58:09', NULL),
+(2, '25-0002', 5, 'Carlos', 'J', 'Lopez', 'Jr', '2003-08-22', '456 Oak Avenue, Zamboanga City', 1, NULL, '2025-10-10 19:58:09', NULL),
+(3, '25-0003', 6, 'Sophia', 'L', 'Diaz', NULL, '2003-03-10', '789 Pine Road, Zamboanga City', 1, NULL, '2025-10-10 19:58:09', NULL),
+(4, '25-0004', 7, 'Miguel', 'R', 'Garcia', NULL, '2003-11-30', '321 Elm Street, Zamboanga City', 1, NULL, '2025-10-10 19:58:09', NULL),
+(5, '25-0005', 8, 'Isabella', 'S', 'Martinez', NULL, '2003-07-18', '654 Maple Lane, Zamboanga City', 1, NULL, '2025-10-10 19:58:09', NULL),
+(6, '25-0006', 9, 'David', 'T', 'Hernandez', NULL, '2003-02-25', '987 Cedar Drive, Zamboanga City', 2, NULL, '2025-10-10 19:58:09', NULL),
+(7, '25-0007', 10, 'Emily', 'P', 'Gonzales', NULL, '2003-09-12', '147 Birch Road, Zamboanga City', 2, NULL, '2025-10-10 19:58:09', NULL),
+(8, '25-0008', 11, 'James', 'K', 'Torres', 'III', '2003-04-05', '258 Walnut Street, Zamboanga City', 2, NULL, '2025-10-10 19:58:09', NULL),
+(9, '25-0009', 12, 'Olivia', 'M', 'Ramirez', NULL, '2003-12-20', '369 Spruce Avenue, Zamboanga City', 2, NULL, '2025-10-10 19:58:09', NULL),
+(10, '25-0010', 13, 'Daniel', 'A', 'Flores', NULL, '2003-06-08', '741 Palm Boulevard, Zamboanga City', 2, NULL, '2025-10-10 19:58:09', NULL);
 
 -- --------------------------------------------------------
 
@@ -414,16 +492,31 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password_hash`, `email`, `contact_number`, `role_id`, `is_active`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'Test', '$2y$10$KDeJl4LSpb6fv8LMkzZujeaVvB..OtB53kt6LLeZUXHXnyUvW8loW', 'test@test.com', '09774531022', 5, 1, NULL, '2025-09-23 17:36:58', '2025-09-23 19:20:56'),
-(3, 'testadmin', '$2y$10$6uyDfH0zMSZQ8T/aZ.TnW.x7TfNXwtcUmDGeEMtY8IaEJNJXl9ac.', 'test@admin.com', NULL, 1, 1, '2025-10-02 08:37:34', '2025-09-23 19:46:07', '2025-10-02 00:37:34'),
-(4, 'testparent', '$2y$19$OTMhmtTGBKai/BxftM2APO.SvDzkeg9LFbtX3DwlYn/8iwlH9aFZm', 'test@parent.com', NULL, 4, 1, '2025-09-24 04:40:39', '2025-09-23 20:38:52', '2025-09-23 20:40:39'),
-(5, 'teststudent', '$2y$19$OTMhmtTGBKai/BxftM2APO.SvDzkeg9LFbtX3DwlYn/8iwlH9aFZm', 'test@student.com', NULL, 3, 1, NULL, '2025-09-23 20:38:52', NULL),
-(12, 'juan.delacruz', '$2y$10$EMRf4YGV9rLVNUCo381t4uVG.QCxzhP7rGgJz.m7qSEC4HAm.vwRO', 'juan.delacruz@student.zppsu.edu.ph', '09123456789', 3, 1, '2025-09-26 04:17:22', '2025-09-23 21:08:34', '2025-09-25 20:17:22'),
-(13, 'maria.santos', '$2y$10$EMRf4YGV9rLVNUCo381t4uVG.QCxzhP7rGgJz.m7qSEC4HAm.vwRO', 'maria.santos@zppsu.edu.ph', '09198765432', 5, 1, '2025-10-02 08:27:59', '2025-09-23 21:08:34', '2025-10-02 00:27:59'),
-(14, 'roberto.delacruz', '$2y$10$EMRf4YGV9rLVNUCo381t4uVG.QCxzhP7rGgJz.m7qSEC4HAm.vwRO', 'roberto.delacruz@email.com', '09234567890', 4, 1, '2025-09-26 21:58:29', '2025-09-23 21:08:34', '2025-09-26 13:58:29'),
-(18, 'chex', '$2y$10$KaaWle08BS4/06WUAJwuHenhKDdnXgPOcbVi6an8ov9RAA.73Z4hC', 'ra@gmail.com', '099229702411', 6, 1, NULL, '2025-09-25 19:49:07', NULL),
-(19, 'ralphmonzales665@gmail.com', '$2y$10$Ot1Bg7VhtjtY0cyaQi3KqeD0.q7oJZM1dyRd4NYe8YcZqm/XFmroq', 'ralphmonzales665@gmail.com', '09774531011', 4, 1, '2025-09-28 05:01:54', '2025-09-27 21:01:54', '2025-09-27 21:01:54'),
-(20, 'tes11', '$2y$10$JB1A9AH6nNFmxryfRQzEoeAf.AVcTm01RYGl.P4XAgOtQAIr/ONei', 'test11@parent.com', '099229701111', 4, 1, NULL, '2025-09-28 21:31:47', '2025-10-01 13:49:51');
+(1, 'admin', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'admin@zppsu.edu.ph', '09123456789', 1, 1, '2025-10-22 00:46:23', '2025-10-10 19:58:09', '2025-10-21 16:46:23'),
+(2, 'teacher.maria', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'maria.santos@zppsu.edu.ph', '09198765432', 6, 1, '2025-10-21 22:33:12', '2025-10-10 19:58:09', '2025-10-21 14:33:12'),
+(3, 'teacher.juan', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'juan.cruz@zppsu.edu.ph', '09234567890', 6, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(4, 'student.anna', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'anna.reyes@student.zppsu.edu.ph', '09345678901', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(5, 'student.carlos', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'carlos.lopez@student.zppsu.edu.ph', '09456789012', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(6, 'student.sophia', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'sophia.diaz@student.zppsu.edu.ph', '09567890123', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(7, 'student.miguel', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'miguel.garcia@student.zppsu.edu.ph', '09678901234', 3, 1, '2025-10-18 13:47:36', '2025-10-10 19:58:09', '2025-10-18 05:47:36'),
+(8, 'student.isabella', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'isabella.martinez@student.zppsu.edu.ph', '09789012345', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(9, 'student.david', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'david.hernandez@student.zppsu.edu.ph', '09890123456', 3, 1, '2025-10-21 22:10:48', '2025-10-10 19:58:09', '2025-10-21 14:10:48'),
+(10, 'student.emily', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'emily.gonzales@student.zppsu.edu.ph', '09901234567', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(11, 'student.james', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'james.torres@student.zppsu.edu.ph', '09112345678', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(12, 'student.olivia', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'olivia.ramirez@student.zppsu.edu.ph', '09223456789', 3, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(13, 'student.daniel', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'daniel.flores@student.zppsu.edu.ph', '09334567890', 3, 1, '2025-10-18 09:17:34', '2025-10-10 19:58:09', '2025-10-18 01:17:34'),
+(14, 'parent.reyes', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'reyes.family@email.com', '09445678901', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(15, 'parent.lopez', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'lopez.family@email.com', '09556789012', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(16, 'parent.diaz', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'diaz.family@email.com', '09667890123', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(17, 'parent.garcia', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'garcia.family@email.com', '09778901234', 4, 1, '2025-10-18 12:44:36', '2025-10-10 19:58:09', '2025-10-18 04:44:36'),
+(18, 'parent.martinez', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'martinez.family@email.com', '09889012345', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(19, 'parent.hernandez', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'hernandez.family@email.com', '09990123456', 4, 1, '2025-10-21 22:07:53', '2025-10-10 19:58:09', '2025-10-21 14:07:53'),
+(20, 'parent.gonzales', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'gonzales.family@email.com', '09101234567', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(21, 'parent.torres', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'torres.family@email.com', '09212345678', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(22, 'parent.ramirez', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'ramirez.family@email.com', '09323456789', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(23, 'parent.flores', '$2y$10$Yad4LUKLUCBaCAZhpVV41OJ/HtlUrclsq7sEhxAffWyDOlyjCF5/K', 'flores.family@email.com', '09434567890', 4, 1, NULL, '2025-10-10 19:58:09', '2025-10-10 20:12:59'),
+(25, 'testcandido', '$2y$10$dcMIjffN9ZfdzBr3ffAxX.ywfgVIRw.sXyAxKsMsliFKTEpZC3hoe', 'ralphmonzales665@gmail.com', '09774531011', 3, 1, NULL, '2025-10-21 14:24:46', '2025-10-21 14:28:08'),
+(26, 'parent@gmail.com', '$2y$10$xRiZJ4BaKnz5ws580NlyYuUyRffkNxsllJiv0yQLLeG4VDWExEhx.', 'parent@gmail.com', '09774531011', 4, 1, '2025-10-21 22:29:53', '2025-10-21 14:29:53', '2025-10-21 14:29:53');
 
 -- --------------------------------------------------------
 
@@ -759,6 +852,19 @@ ALTER TABLE `classes`
   ADD KEY `adviser_staff_id` (`adviser_staff_id`);
 
 --
+-- Indexes for table `courses`
+--
+ALTER TABLE `courses`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `department_id` (`department_id`);
+
+--
+-- Indexes for table `departments`
+--
+ALTER TABLE `departments`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `messages`
 --
 ALTER TABLE `messages`
@@ -813,7 +919,8 @@ ALTER TABLE `students`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `student_number` (`student_number`),
   ADD KEY `class_id` (`class_id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `course_id` (`course_id`);
 
 --
 -- Indexes for table `users`
@@ -853,31 +960,31 @@ ALTER TABLE `violation_types`
 -- AUTO_INCREMENT for table `appeals`
 --
 ALTER TABLE `appeals`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `audit_trail`
 --
 ALTER TABLE `audit_trail`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `cases`
 --
 ALTER TABLE `cases`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `case_evidence`
 --
 ALTER TABLE `case_evidence`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `case_logs`
 --
 ALTER TABLE `case_logs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `case_status`
@@ -889,19 +996,31 @@ ALTER TABLE `case_status`
 -- AUTO_INCREMENT for table `classes`
 --
 ALTER TABLE `classes`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `courses`
+--
+ALTER TABLE `courses`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `departments`
+--
+ALTER TABLE `departments`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `messages`
 --
 ALTER TABLE `messages`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT for table `notification_method`
@@ -913,7 +1032,7 @@ ALTER TABLE `notification_method`
 -- AUTO_INCREMENT for table `parent_student`
 --
 ALTER TABLE `parent_student`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -925,19 +1044,19 @@ ALTER TABLE `roles`
 -- AUTO_INCREMENT for table `staff`
 --
 ALTER TABLE `staff`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- AUTO_INCREMENT for table `violation_categories`
@@ -949,13 +1068,13 @@ ALTER TABLE `violation_categories`
 -- AUTO_INCREMENT for table `violation_penalties`
 --
 ALTER TABLE `violation_penalties`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=162;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=166;
 
 --
 -- AUTO_INCREMENT for table `violation_types`
 --
 ALTER TABLE `violation_types`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
 
 --
 -- Constraints for dumped tables
@@ -1007,6 +1126,12 @@ ALTER TABLE `classes`
   ADD CONSTRAINT `classes_ibfk_1` FOREIGN KEY (`adviser_staff_id`) REFERENCES `staff` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `courses`
+--
+ALTER TABLE `courses`
+  ADD CONSTRAINT `courses_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `messages`
 --
 ALTER TABLE `messages`
@@ -1040,7 +1165,8 @@ ALTER TABLE `staff`
 --
 ALTER TABLE `students`
   ADD CONSTRAINT `students_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `students_ibfk_2` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `students_ibfk_2` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `students_ibfk_3` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `users`

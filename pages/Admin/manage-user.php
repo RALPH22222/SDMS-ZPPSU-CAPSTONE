@@ -62,19 +62,43 @@
             
             error_log("Creating user with data: " . print_r($_POST, true));
           
-            if ($username === '' || $role_id <= 0 || $plain === '' || $first_name === '' || $last_name === '') {
-                throw new Exception('Username, Name, Role and Password are required.');
+            // Basic required checks for create
+            if ($role_id <= 0 || $plain === '' || $first_name === '' || $last_name === '') {
+                throw new Exception('Name, Role and Password are required.');
+            }
+
+            // If username not provided in the create form, generate one from name or email
+            if ($username === '') {
+                $base = '';
+                if ($first_name !== '' || $last_name !== '') {
+                    $base = strtolower(preg_replace('/[^a-z0-9]+/', '', $first_name . '.' . $last_name));
+                }
+                if ($base === '' && $email) {
+                    $parts = explode('@', $email);
+                    $base = strtolower(preg_replace('/[^a-z0-9]+/', '', $parts[0]));
+                }
+                if ($base === '') {
+                    $base = 'user';
+                }
+
+                // Ensure uniqueness by appending numbers if necessary
+                $candidate = $base;
+                $i = 0;
+                $checkStmt = $pdo->prepare('SELECT id FROM users WHERE username = ?');
+                while (true) {
+                    $checkStmt->execute([$candidate]);
+                    if (!$checkStmt->fetch()) break;
+                    $i++;
+                    $candidate = $base . $i;
+                    if ($i > 1000) { // safety fallback
+                        throw new Exception('Unable to generate unique username, please provide one.');
+                    }
+                }
+                $username = $candidate;
+                error_log("Auto-generated username: $username");
             }
             
-            $roleCheck = $pdo->prepare('SELECT id, name FROM roles WHERE id = ?');
-            $roleCheck->execute([$role_id]);
-            $role = $roleCheck->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$role) {
-                throw new Exception('Invalid role selected (ID: ' . $role_id . '). Available roles: ' . 
-                    implode(', ', array_map(function($r) { return $r['id'] . ':' . $r['name']; }, $pdo->query('SELECT id, name FROM roles')->fetchAll(PDO::FETCH_ASSOC))));
-            }
-            
+            // Now validate username uniqueness
             $userCheck = $pdo->prepare('SELECT id FROM users WHERE username = ?');
             $userCheck->execute([$username]);
             if ($userCheck->fetch()) {
@@ -137,9 +161,10 @@
                 $student_number = $current_year . '-' . $random_number;
                 $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
                 $address = trim($_POST['address'] ?? '');
+                $course_id = (int)($_POST['course_id'] ?? 0);
                 
-                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
                 $studentStmt->execute([
                     $user_id, 
                     $student_number, 
@@ -148,7 +173,8 @@
                     $last_name,
                     $suffix ?: null,
                     $birthdate,
-                    $address
+                    $address,
+                    $course_id
                 ]);
                 
                 
@@ -211,14 +237,20 @@
         $pdo->beginTransaction();
         try {
             $id = (int)($_POST['id'] ?? 0);
-            $username = trim($_POST['username'] ?? '');
+            // username removed from form; do not require or update it here
             $email = trim($_POST['email'] ?? '') ?: null;
             $contact = trim($_POST['contact_number'] ?? '') ?: null;
             $role_id = (int)($_POST['role_id'] ?? 0);
             $is_active = isset($_POST['is_active']) ? 1 : 0;
             
-            if ($id <= 0 || $username === '' || $role_id <= 0) {
-                throw new Exception('User ID, Username and Role are required.');
+            // get posted names for role-change handling
+            $first_name = trim($_POST['first_name'] ?? '');
+            $middle_name = trim($_POST['middle_name'] ?? '');
+            $last_name = trim($_POST['last_name'] ?? '');
+            $suffix = trim($_POST['suffix'] ?? '');
+
+            if ($id <= 0 || $role_id <= 0) {
+                throw new Exception('User ID and Role are required.');
             }
             
             // Get current user data
@@ -236,31 +268,42 @@
             $is_student_now = ($role_id == 3); // Student role ID is 3
             $was_student = ($current_role_id == 3);
             
-            // Handle role changes
+            // Handle role changes using posted first_name/last_name instead of username parsing
             if ($is_teacher_now && !$was_teacher) {
                 // Role changed to teacher - create staff record
-                $name_parts = explode('.', $username);
-                $first_name = !empty($name_parts[0]) ? ucfirst($name_parts[0]) : 'Teacher';
-                $last_name = !empty($name_parts[1]) ? ucfirst(explode('@', $name_parts[1])[0]) : 'User';
+                $s_first = $first_name !== '' ? $first_name : 'Teacher';
+                $s_last = $last_name !== '' ? $last_name : 'User';
 
                 $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, first_name, last_name, department, position, created_at) VALUES (?, ?, ?, "Faculty", "Teacher", CURRENT_TIMESTAMP())');
-                $staffStmt->execute([$id, $first_name, $last_name]);
-                error_log("Created staff record for teacher with user_id: $id, name: $first_name $last_name");
+                $staffStmt->execute([$id, $s_first, $s_last]);
+                error_log("Created staff record for teacher with user_id: $id, name: $s_first $s_last");
             } 
             // Handle role change to student
             elseif ($is_student_now && !$was_student) {
                 // Role changed to student - create student record
-                $name_parts = explode('.', $username);
-                $first_name = !empty($name_parts[0]) ? ucfirst($name_parts[0]) : 'Student';
-                $last_name = !empty($name_parts[1]) ? ucfirst(explode('@', $name_parts[1])[0]) : 'Name';
-                 
+                $s_first = $first_name !== '' ? $first_name : 'Student';
+                $s_last = $last_name !== '' ? $last_name : 'Name';
+                $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
+                $address = trim($_POST['address'] ?? '');
+                $course_id = (int)($_POST['course_id'] ?? 0);
+                
                 $current_year = date('y');
                 $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
                 $student_number = $current_year . '-' . $random_number;
                 
-                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, last_name, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP())');
-                $studentStmt->execute([$id, $student_number, $first_name, $last_name]);
-                error_log("Created student record for user_id: $id, student_number: $student_number, name: $first_name $last_name");
+                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                $studentStmt->execute([
+                    $id, 
+                    $student_number, 
+                    $s_first,
+                    $middle_name ?: null,
+                    $s_last,
+                    $suffix ?: null,
+                    $birthdate,
+                    $address,
+                    $course_id > 0 ? $course_id : null
+                ]);
+                error_log("Created student record for user_id: $id, student_number: $student_number, name: $s_first $s_last, course_id: $course_id");
             }
             // Handle role change from teacher to non-teacher
             elseif (!$is_teacher_now && $was_teacher) {
@@ -274,28 +317,67 @@
                 $pdo->prepare('DELETE FROM students WHERE user_id = ?')->execute([$id]);
                 error_log("Removed student record for user_id: $id");
             }
-            // Handle role change to teacher
-            elseif ($is_teacher_now && !$was_teacher) {
-                $name_source = !empty($username) ? $username : $email;
-                $name_parts = explode('@', $name_source);
-                $name_parts = explode('.', $name_parts[0]);
-                $first_name = !empty($name_parts[0]) ? ucfirst($name_parts[0]) : 'Teacher';
-                $last_name = !empty($name_parts[1]) ? ucfirst($name_parts[1]) : 'User';
-                
-                $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, first_name, last_name, department, position, created_at) VALUES (?, ?, ?, "Faculty", "Teacher", CURRENT_TIMESTAMP())');
-                $staffStmt->execute([$id, $first_name, $last_name]);
-                error_log("Created staff record for teacher with user_id: $id, name: $first_name $last_name");
-            } 
-
-            elseif (!$is_teacher_now && $was_teacher) {
-                // Role changed from teacher - clean up staff record
-                $pdo->prepare('DELETE FROM staff WHERE user_id = ?')->execute([$id]);
-                error_log("Removed staff record for user_id: $id");
-            }
             
-            // Update user with new data
-            $stmt = $pdo->prepare('UPDATE users SET username = ?, email = ?, contact_number = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP() WHERE id = ?');
-            $stmt->execute([$username, $email, $contact, $role_id, $is_active, $id]);
+            // Update user with new data (username is not updated from the modal)
+            $stmt = $pdo->prepare('UPDATE users SET email = ?, contact_number = ?, role_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP() WHERE id = ?');
+            $stmt->execute([$email, $contact, $role_id, $is_active, $id]);
+            
+            // If the user is a student, update their student record
+            if ($is_student_now) {
+                $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
+                $address = trim($_POST['address'] ?? '');
+                $course_id = (int)($_POST['course_id'] ?? 0);
+                
+                // Check if student record exists
+                $studentCheck = $pdo->prepare('SELECT id FROM students WHERE user_id = ?');
+                $studentCheck->execute([$id]);
+                
+                if ($studentCheck->fetch()) {
+                    // Update existing student record
+                    $studentStmt = $pdo->prepare('UPDATE students SET 
+                        first_name = ?, 
+                        middle_name = ?, 
+                        last_name = ?, 
+                        suffix = ?, 
+                        birthdate = ?, 
+                        address = ?,
+                        course_id = ?,
+                        updated_at = CURRENT_TIMESTAMP() 
+                        WHERE user_id = ?');
+                    $studentStmt->execute([
+                        $first_name,
+                        $middle_name ?: null,
+                        $last_name,
+                        $suffix ?: null,
+                        $birthdate,
+                        $address,
+                        $course_id > 0 ? $course_id : null,
+                        $id
+                    ]);
+                    error_log("Updated student record for user_id: $id, course_id: $course_id");
+                } else {
+                    // Create new student record if it doesn't exist
+                    $current_year = date('y');
+                    $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                    $student_number = $current_year . '-' . $random_number;
+                    
+                    $studentStmt = $pdo->prepare('INSERT INTO students 
+                        (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, created_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                    $studentStmt->execute([
+                        $id, 
+                        $student_number, 
+                        $first_name,
+                        $middle_name ?: null,
+                        $last_name,
+                        $suffix ?: null,
+                        $birthdate,
+                        $address,
+                        $course_id > 0 ? $course_id : null
+                    ]);
+                    error_log("Created new student record for user_id: $id, course_id: $course_id");
+                }
+            }
             
             $pdo->commit();
             $_SESSION['flash'] = flash('success', 'User updated successfully.');
@@ -388,11 +470,42 @@
   if ($filter_role > 0) { $where[] = 'u.role_id = ?'; $params[] = $filter_role; }
   if ($filter_status !== null) { $where[] = 'u.is_active = ?'; $params[] = $filter_status; }
   $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
-  $usersStmt = $pdo->prepare("SELECT u.id, u.username, u.email, u.contact_number, u.role_id, u.is_active, u.last_login, r.name AS role_name
-                              FROM users u
-                              JOIN roles r ON r.id = u.role_id
-                              $whereSql
-                              ORDER BY u.created_at DESC");
+  // previous simple users query replaced with left joins to include role-specific fields
+  $usersStmt = $pdo->prepare("
+    SELECT 
+      u.id,
+      u.username,
+      u.email,
+      u.contact_number,
+      u.role_id,
+      u.is_active,
+      u.last_login,
+      r.name AS role_name,
+      -- Name source: prefer student, then staff (so edit form can populate name fields)
+      COALESCE(s.first_name, st.first_name, '') AS first_name,
+      COALESCE(s.middle_name, st.middle_name, '') AS middle_name,
+      COALESCE(s.last_name, st.last_name, '') AS last_name,
+      COALESCE(s.suffix, st.suffix, '') AS suffix,
+      -- student fields (if any)
+      s.student_number AS student_number,
+      s.course_id AS course_id,
+      s.birthdate AS birthdate,
+      s.address AS address,
+      -- staff/teacher fields (if any)
+      st.staff_number AS staff_number,
+      st.department AS department,
+      st.position AS position,
+      -- parent relation (if any) - may be null or one row
+      p.student_id AS student_id,
+      p.relationship AS relationship
+    FROM users u
+    JOIN roles r ON r.id = u.role_id
+    LEFT JOIN students s ON s.user_id = u.id
+    LEFT JOIN staff st ON st.user_id = u.id
+    LEFT JOIN parent_student p ON p.parent_user_id = u.id
+    $whereSql
+    ORDER BY u.created_at DESC
+  ");
   $usersStmt->execute($params);
   $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -497,154 +610,167 @@
   </main>
 </div>
 <div id="userModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4 overflow-y-auto">
-  <div class="bg-white w-[95%] max-w-lg rounded-lg shadow-lg p-4 sm:p-6">
+  <div class="bg-white w-[95%] max-w-lg rounded-lg shadow-lg p-4 sm:p-6 max-h-[80vh] overflow-hidden">
     <div class="flex items-center justify-between mb-4">
       <h3 id="userModalTitle" class="text-lg font-semibold"></h3>
       <button type="button" onclick="closeUserModal()" class="text-gray-400 hover:text-gray-500">
         <i class="fa fa-times"></i>
       </button>
     </div>
+
     <form method="post" id="userForm" class="space-y-4">
       <input type="hidden" name="csrf" value="<?php echo $csrf; ?>" />
       <input type="hidden" name="action" value="" />
       <input type="hidden" name="id" value="" />
       
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <!-- Basic Information for All Users -->
-        <div class="sm:col-span-2">
-          <label class="block text-sm font-medium mb-1">Username <span class="text-red-500">*</span></label>
-          <input type="text" name="username" id="username" class="w-full border rounded px-3 py-2" required />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">First Name <span class="text-red-500">*</span></label>
-          <input type="text" name="first_name" id="first_name" class="w-full border rounded px-3 py-2" />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Last Name <span class="text-red-500">*</span></label>
-          <input type="text" name="last_name" id="last_name" class="w-full border rounded px-3 py-2" />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Middle Name</label>
-          <input type="text" name="middle_name" id="middle_name" class="w-full border rounded px-3 py-2" />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Suffix</label>
-          <input type="text" name="suffix" id="suffix" placeholder="e.g., Jr., Sr., III" class="w-full border rounded px-3 py-2" />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Email <span class="text-red-500">*</span></label>
-          <input type="email" name="email" id="email" class="w-full border rounded px-3 py-2" required />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Contact Number</label>
-          <input type="text" name="contact_number" id="contact_number" class="w-full border rounded px-3 py-2" />
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Role <span class="text-red-500">*</span></label>
-          <select name="role_id" id="role_id" onchange="toggleRoleFields()" class="w-full border rounded px-3 py-2" required>
-            <option value="">Select Role</option>
-            <?php 
-            $roleMap = [];
-            foreach ($roles as $r) {
-                $roleMap[strtolower($r['name'])] = $r['id'];
-                echo '<option value="' . (int)$r['id'] . '">' . htmlspecialchars($r['name']) . '</option>';
-            }
-            ?>
-          </select>
-        </div>
-        
-        <div>
-          <label class="block text-sm font-medium mb-1">Status</label>
-          <div class="mt-1">
-            <label class="inline-flex items-center">
-              <input type="checkbox" name="is_active" value="1" class="rounded border-gray-300 text-primary focus:ring-primary" checked />
-              <span class="ml-2">Active</span>
-            </label>
-          </div>
-        </div>
-        
-        <div id="passwordRow" class="sm:col-span-2">
-          <label class="block text-sm font-medium mb-1">Password <span class="text-red-500">*</span></label>
-          <div class="flex gap-2">
-            <input type="text" name="password" id="password" class="flex-1 border rounded px-3 py-2" required />
-            <button type="button" onclick="genPwd('#password')" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
-              <i class="fa fa-refresh"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Student Specific Fields -->
-      <div id="studentFieldsContainer" class="hidden border-t pt-4 mt-4 space-y-4">
-        <h4 class="font-medium text-gray-900">Student Information</h4>
-        <!-- Student Fields -->
-        <div id="studentFields">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label for="student_number" class="block text-sm font-medium mb-1">Student Number <span class="text-red-500">*</span></label>
-              <input type="text" name="student_number" id="student_number" class="w-full border rounded px-3 py-2" />
-            </div>
-            <div>
-              <label for="birthdate" class="block text-sm font-medium mb-1">Birthdate <span class="text-red-500">*</span></label>
-              <input type="date" name="birthdate" id="birthdate" class="w-full border rounded px-3 py-2" />
-            </div>
-            <div class="sm:col-span-2">
-              <label for="address" class="block text-sm font-medium mb-1">Address <span class="text-red-500">*</span></label>
-              <textarea name="address" id="address" class="w-full border rounded px-3 py-2" rows="2"></textarea>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Parent Specific Fields -->
-      <div id="parentFields" class="hidden border-t pt-4 mt-4 space-y-4">
-        <h4 class="font-medium text-gray-900">Parent Information</h4>
+      <div class="modal-body max-h-[60vh] overflow-y-auto pr-2 space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2">
-            <label for="student_id" class="block text-sm font-medium mb-1">Student ID <span class="text-red-500">*</span></label>
-            <input type="text" name="student_id" id="student_id" class="w-full border rounded px-3 py-2" placeholder="Enter student ID" />
+          <!-- Basic Information for All Users -->
+          <!-- username removed from form -->
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">First Name <span class="text-red-500">*</span></label>
+            <input type="text" name="first_name" id="first_name" class="w-full border rounded px-3 py-2" />
           </div>
-          <div class="sm:col-span-2">
-            <label for="relationship" class="block text-sm font-medium mb-1">Relationship <span class="text-red-500">*</span></label>
-            <select name="relationship" id="relationship" class="w-full border rounded px-3 py-2">
-              <option value="">Select Relationship</option>
-              <option value="Mother">Mother</option>
-              <option value="Father">Father</option>
-              <option value="Guardian">Guardian</option>
-              <option value="Sibling">Sibling</option>
-              <option value="Other">Other</option>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Last Name <span class="text-red-500">*</span></label>
+            <input type="text" name="last_name" id="last_name" class="w-full border rounded px-3 py-2" />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Middle Name</label>
+            <input type="text" name="middle_name" id="middle_name" class="w-full border rounded px-3 py-2" />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Suffix</label>
+            <input type="text" name="suffix" id="suffix" placeholder="e.g., Jr., Sr., III" class="w-full border rounded px-3 py-2" />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Email <span class="text-red-500">*</span></label>
+            <input type="email" name="email" id="email" class="w-full border rounded px-3 py-2" required />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Contact Number</label>
+            <input type="text" name="contact_number" id="contact_number" class="w-full border rounded px-3 py-2" />
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Role <span class="text-red-500">*</span></label>
+            <select name="role_id" id="role_id" onchange="toggleRoleFields()" class="w-full border rounded px-3 py-2" required>
+              <option value="">Select Role</option>
+              <?php 
+              $roleMap = [];
+              foreach ($roles as $r) {
+                  $roleMap[strtolower($r['name'])] = $r['id'];
+                  echo '<option value="' . (int)$r['id'] . '">' . htmlspecialchars($r['name']) . '</option>';
+              }
+              ?>
             </select>
           </div>
+          
+          <div>
+            <label class="block text-sm font-medium mb-1">Status</label>
+            <div class="mt-1">
+              <label class="inline-flex items-center">
+                <input type="checkbox" name="is_active" value="1" class="rounded border-gray-300 text-primary focus:ring-primary" checked />
+                <span class="ml-2">Active</span>
+              </label>
+            </div>
+          </div>
+          
+          <div id="passwordRow" class="sm:col-span-2">
+            <label class="block text-sm font-medium mb-1">Password <span class="text-red-500">*</span></label>
+            <div class="flex gap-2">
+              <!-- removed `required` attribute here; JS will set required when opening Create User -->
+              <input type="text" name="password" id="password" class="flex-1 border rounded px-3 py-2" placeholder="Enter password" />
+              <button type="button" onclick="genPwd('#password')" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200">
+                <i class="fa fa-refresh"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Student Specific Fields -->
+        <div id="studentFieldsContainer" class="hidden border-t pt-4 mt-4 space-y-4">
+          <h4 class="font-medium text-gray-900">Student Information</h4>
+          <!-- Student Fields -->
+          <div id="studentFields">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="student_number" class="block text-sm font-medium mb-1">Student Number <span class="text-red-500">*</span></label>
+                <input type="text" name="student_number" id="student_number" class="w-full border rounded px-3 py-2" />
+              </div>
+              <div>
+                <label for="birthdate" class="block text-sm font-medium mb-1">Birthdate <span class="text-red-500">*</span></label>
+                <input type="date" name="birthdate" id="birthdate" class="w-full border rounded px-3 py-2" />
+              </div>
+              <div class="sm:col-span-2">
+                <label for="address" class="block text-sm font-medium mb-1">Address <span class="text-red-500">*</span></label>
+                <textarea name="address" id="address" class="w-full border rounded px-3 py-2" rows="2"></textarea>
+              </div>
+              <div class="sm:col-span-2">
+                <label for="course_id" class="block text-sm font-medium mb-1">Course <span class="text-red-500">*</span></label>
+                <select name="course_id" id="course_id" class="w-full border rounded px-3 py-2" required>
+                  <option value="">Select Course</option>
+                  <?php
+                  $courses = $pdo->query('SELECT id, CONCAT(course_code, " - ", course_name) as course_display FROM courses ORDER BY course_code');
+                  foreach ($courses as $course) {
+                    echo "<option value='" . htmlspecialchars($course['id']) . "'>" . htmlspecialchars($course['course_display']) . "</option>";
+                  }
+                  ?>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Parent Specific Fields -->
+        <div id="parentFields" class="hidden border-t pt-4 mt-4 space-y-4">
+          <h4 class="font-medium text-gray-900">Parent Information</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+              <label for="student_id" class="block text-sm font-medium mb-1">Student ID <span class="text-red-500">*</span></label>
+              <input type="text" name="student_id" id="student_id" class="w-full border rounded px-3 py-2" placeholder="Enter student ID" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="relationship" class="block text-sm font-medium mb-1">Relationship <span class="text-red-500">*</span></label>
+              <select name="relationship" id="relationship" class="w-full border rounded px-3 py-2">
+                <option value="">Select Relationship</option>
+                <option value="Mother">Mother</option>
+                <option value="Father">Father</option>
+                <option value="Guardian">Guardian</option>
+                <option value="Sibling">Sibling</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Staff/Teacher Common Fields -->
+        <div id="staffTeacherFields" class="hidden border-t pt-4 mt-4 space-y-4">
+          <h4 class="font-medium text-gray-900">Employment Information</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Staff/Teacher ID <span class="text-red-500">*</span></label>
+              <input type="text" name="staff_number" id="staff_number" class="w-full border rounded px-3 py-2 bg-gray-100" readonly />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Department <span class="text-red-500">*</span></label>
+              <input type="text" name="department" id="department" class="w-full border rounded px-3 py-2" placeholder="e.g., IT, Math, Science" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium mb-1">Position <span class="text-red-500">*</span></label>
+              <input type="text" name="position" id="position" class="w-full border rounded px-3 py-2" placeholder="e.g., Teacher, Head, Coordinator" />
+            </div>
+          </div>
         </div>
       </div>
-      
-      <!-- Staff/Teacher Common Fields -->
-      <div id="staffTeacherFields" class="hidden border-t pt-4 mt-4 space-y-4">
-        <h4 class="font-medium text-gray-900">Employment Information</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">Staff/Teacher ID <span class="text-red-500">*</span></label>
-            <input type="text" name="staff_number" id="staff_number" class="w-full border rounded px-3 py-2 bg-gray-100" readonly />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Department <span class="text-red-500">*</span></label>
-            <input type="text" name="department" id="department" class="w-full border rounded px-3 py-2" placeholder="e.g., IT, Math, Science" />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="block text-sm font-medium mb-1">Position <span class="text-red-500">*</span></label>
-            <input type="text" name="position" id="position" class="w-full border rounded px-3 py-2" placeholder="e.g., Teacher, Head, Coordinator" />
-          </div>
-        </div>
-      </div>
-      
-      <div class="flex justify-end gap-2 mt-6">
+
+      <div class="flex justify-end gap-2 mt-4">
         <button type="button" onclick="closeUserModal()" class="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
         <button type="submit" class="px-4 py-2 bg-primary text-white rounded hover:opacity-90">Save</button>
       </div>
@@ -784,7 +910,7 @@
     userForm.action.value = 'create_user';
     userForm.reset();
     userForm.id.value = '';
-    userForm.username.value = '';
+    // username removed - don't touch userForm.username
     userForm.first_name.value = '';
     userForm.middle_name.value = '';
     userForm.last_name.value = '';
@@ -798,7 +924,7 @@
     
     // Reset all role-specific fields
     [
-      'student_number', 'birthdate', 'address',  // Student
+      'student_number', 'birthdate', 'address', 'course_id',  // Student
       'student_id', 'relationship',              // Parent
       'staff_number', 'department', 'position'   // Staff/Teacher
     ].forEach(field => {
@@ -818,13 +944,19 @@
     });
     
     // Set required for basic fields
-    ['first_name', 'last_name', 'username', 'email'].forEach(fieldId => {
+    ['first_name', 'last_name', 'email'].forEach(fieldId => {
       const field = document.getElementById(fieldId);
       if (field) field.required = true;
     });
+
+    // Ensure password is NOT auto-generated on create; just show placeholder and empty value
+    const pwdInput = document.getElementById('password');
+    if (pwdInput) {
+      pwdInput.value = '';
+      pwdInput.placeholder = 'Enter password';
+    }
     
     show(userModal);
-    genPwd('#password');
     
     // Initialize role fields based on default selection
     toggleRoleFields();
@@ -834,7 +966,7 @@
     userModalTitle.textContent = 'Edit User';
     userForm.action.value = 'update_user';
     userForm.id.value = u.id;
-    userForm.username.value = u.username || '';
+    // username removed - do not set or require username
     userForm.first_name.value = u.first_name || '';
     userForm.middle_name.value = u.middle_name || '';
     userForm.last_name.value = u.last_name || '';
@@ -853,6 +985,7 @@
       student_number: u.student_number,
       birthdate: u.birthdate,
       address: u.address,
+      course_id: u.course_id,
       // Parent fields
       student_id: u.student_id,
       relationship: u.relationship,
@@ -864,8 +997,8 @@
     
     Object.entries(roleFields).forEach(([fieldId, value]) => {
       const field = document.getElementById(fieldId);
-      if (field && value !== undefined) {
-        field.value = value;
+      if (field) {
+        field.value = value !== undefined && value !== null ? value : '';
       }
     });
     
@@ -928,7 +1061,8 @@
       parent: document.getElementById('parentFields'),
       staff: document.getElementById('staffTeacherFields'),
       teacher: document.getElementById('staffTeacherFields')
-    };
+    };           
+    
     
     // Hide all role-specific fields first
     Object.values(roleContainers).forEach(container => {
@@ -937,7 +1071,7 @@
     
     // Reset all role-specific required fields
     const allRoleFields = [
-      'student_number', 'birthdate', 'address', // Student
+      'student_number', 'birthdate', 'address', 'course_id', // Student
       'student_id', 'relationship',            // Parent
       'department', 'position'                 // Staff/Teacher
     ];
@@ -952,10 +1086,17 @@
       case ROLE_IDS.STUDENT:
         if (roleContainers.student) {
           roleContainers.student.classList.remove('hidden');
-          const studentFields = ['student_number', 'birthdate', 'address', 'first_name', 'last_name'];
+          const studentFields = ['student_number', 'birthdate', 'address', 'course_id', 'first_name', 'last_name'];
           studentFields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
-            if (field) field.required = true;
+            if (field) {
+              field.required = true;
+              // set placeholder for student number in YY-XXXX format
+              if (fieldId === 'student_number') {
+                const yy = new Date().getFullYear().toString().slice(-2);
+                field.placeholder = `${yy}-0001`;
+              }
+            }
           });
         }
         break;

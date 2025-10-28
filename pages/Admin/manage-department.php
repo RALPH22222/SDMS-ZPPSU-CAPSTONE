@@ -194,9 +194,9 @@ $current_tab = isset($_GET['tab']) && in_array($_GET['tab'], ['departments', 'co
 // Fetch departments
 try {
     $sql = "SELECT 
-                id AS Department_ID,
-                department_name AS 'Department Name',
-                abbreviation AS 'Code'
+                id,
+                department_name AS name,
+                abbreviation AS code
             FROM departments
             ORDER BY department_name";
     $stmt = $pdo->query($sql);
@@ -210,13 +210,13 @@ try {
 // Fetch courses
 try {
     $sql = "SELECT 
-                c.id AS Course_ID,
-                c.course_name AS 'Course Name',
-                c.course_code AS 'Code',
-                d.department_name AS 'Department',
+                c.id,
+                c.course_name,
+                c.course_code,
+                d.department_name AS department,
                 c.department_id
             FROM courses c
-            JOIN departments d ON c.department_id = d.id
+            LEFT JOIN departments d ON c.department_id = d.id
             ORDER BY d.department_name, c.course_name";
     $stmt = $pdo->query($sql);
     $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -226,7 +226,6 @@ try {
     set_alert('error', 'Error loading courses. ' . $e->getMessage());
 }
 
-include '../../components/admin-head.php';
 include '../../components/admin-sidebar.php';
 ?>
 
@@ -319,7 +318,7 @@ include '../../components/admin-sidebar.php';
                 </div>
                 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <table id="departmentsTable" class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -351,27 +350,27 @@ include '../../components/admin-sidebar.php';
                                         </div>
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900">
-                                                <?= htmlspecialchars($dept['Department Name']) ?>
+                                                <?= htmlspecialchars($dept['name']) ?>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                                        <?= htmlspecialchars($dept['Code']) ?>
+                                        <?= htmlspecialchars($dept['code']) ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button type="button" 
                                             class="text-blue-600 hover:text-blue-900 p-1.5 rounded-full hover:bg-blue-50 transition-colors duration-200"
                                             title="Edit"
-                                            onclick="editDepartment(<?= $dept['Department_ID'] ?>, '<?= addslashes($dept['Department Name']) ?>', '<?= addslashes($dept['Code']) ?>')">
+                                            onclick="editDepartment(<?= $dept['id'] ?>, '<?= addslashes($dept['name']) ?>', '<?= addslashes($dept['code']) ?>')">
                                         <i class="fas fa-edit w-4 h-4"></i>
                                     </button>
                                     <button type="button" 
                                             class="text-red-600 hover:text-red-900 p-1.5 rounded-full hover:bg-red-50 transition-colors duration-200 ml-1"
                                             title="Delete"
-                                            onclick="confirmDeleteDepartment(<?= $dept['Department_ID'] ?>, '<?= addslashes($dept['Department Name']) ?>')">
+                                            onclick="confirmDeleteDepartment(<?= $dept['id'] ?>, '<?= addslashes($dept['name']) ?>')">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
                                 </td>
@@ -401,7 +400,7 @@ include '../../components/admin-sidebar.php';
                 </div>
                 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
+                    <table id="coursesTable" class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -426,30 +425,30 @@ include '../../components/admin-sidebar.php';
                                         </div>
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900">
-                                                <?= htmlspecialchars($course['Course Name']) ?>
+                                                <?= htmlspecialchars($course['course_name']) ?>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                                        <?= htmlspecialchars($course['Code']) ?>
+                                        <?= htmlspecialchars($course['course_code']) ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= $course['Department'] ? htmlspecialchars($course['Department']) : '<span class="text-gray-400">No department</span>' ?>
+                                    <?= $course['department'] ? htmlspecialchars($course['department']) : '<span class="text-gray-400">No department</span>' ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button type="button" 
                                             class="text-blue-600 hover:text-blue-900 p-1.5 rounded-full hover:bg-blue-50 transition-colors duration-200"
                                             title="Edit"
-                                            onclick="editCourse(<?= $course['Course_ID'] ?>, '<?= addslashes($course['Course Name']) ?>', '<?= addslashes($course['Code']) ?>', '<?= $course['department_id'] ?>')">
+                                            onclick="editCourse(<?= $course['id'] ?>, '<?= addslashes($course['course_name']) ?>', '<?= addslashes($course['course_code']) ?>', '<?= $course['department_id'] ?>')">
                                         <i class="fas fa-edit w-4 h-4"></i>
                                     </button>
                                     <button type="button" 
                                             class="text-red-600 hover:text-red-900 p-1.5 rounded-full hover:bg-red-50 transition-colors duration-200 ml-1"
                                             title="Delete"
-                                            onclick="confirmDeleteCourse(<?= $course['Course_ID'] ?>, '<?= addslashes($course['Course Name']) ?>')">
+                                            onclick="confirmDeleteCourse(<?= $course['id'] ?>, '<?= addslashes($course['course_name']) ?>')">
                                         <i class="fas fa-trash w-4 h-4"></i>
                                     </button>
                                 </td>
@@ -469,7 +468,7 @@ include '../../components/admin-sidebar.php';
         </div>
 
 <!-- Department Modal -->
-<div id="departmentModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+<div id="departmentModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div class="p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4" id="departmentModalTitle">Add Department</h3>
@@ -491,9 +490,9 @@ include '../../components/admin-sidebar.php';
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-200">
                         Cancel
                     </button>
-                    <button type="submit" 
+                    <button type="submit" id="departmentSubmit" name="add_department"
                             class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 transition-colors duration-200">
-                        Save Changes
+                        Add Department
                     </button>
                 </div>
             </form>
@@ -502,7 +501,7 @@ include '../../components/admin-sidebar.php';
 </div>
 
 <!-- Course Modal -->
-<div id="courseModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+<div id="courseModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div class="p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4" id="courseModalTitle">Add Course</h3>
@@ -534,9 +533,9 @@ include '../../components/admin-sidebar.php';
                             class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors duration-200">
                         Cancel
                     </button>
-                    <button type="submit" 
+                    <button type="submit" id="courseSubmit" name="add_course"
                             class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 transition-colors duration-200">
-                        Save Changes
+                        Add Course
                     </button>
                 </div>
             </form>
@@ -545,7 +544,7 @@ include '../../components/admin-sidebar.php';
 </div>
 
 <!-- Delete Department Modal -->
-<div id="deleteDepartmentModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+<div id="deleteDepartmentModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div class="p-6">
             <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
@@ -571,7 +570,7 @@ include '../../components/admin-sidebar.php';
 </div>
 
 <!-- Course Delete Confirmation Modal -->
-<div id="deleteCourseModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+<div id="deleteCourseModal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 hidden">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
         <div class="p-6">
             <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
@@ -610,18 +609,17 @@ document.addEventListener('DOMContentLoaded', function() {
             columnDefs: [
                 { orderable: false, targets: -1 } // Disable sorting on actions column
             ],
-            order: [[1, 'asc']] // Sort by name by default
+            order: [[0, 'asc']]
         });
     }
-    
-    // Initialize DataTable for courses
+
     if (document.getElementById('coursesTable')) {
         $('#coursesTable').DataTable({
             responsive: true,
             columnDefs: [
-                { orderable: false, targets: -1 } // Disable sorting on actions column
+                { orderable: false, targets: -1 }
             ],
-            order: [[1, 'asc']] // Sort by course name by default
+            order: [[0, 'asc']]
         });
     }
 });
@@ -632,9 +630,8 @@ function showDepartmentModal(department = null) {
     const form = document.getElementById('departmentForm');
     const title = document.getElementById('departmentModalTitle');
     const submitBtn = document.getElementById('departmentSubmit');
-    
+
     if (department) {
-        // Edit mode
         title.textContent = 'Edit Department';
         submitBtn.name = 'edit_department';
         submitBtn.textContent = 'Update Department';
@@ -642,25 +639,27 @@ function showDepartmentModal(department = null) {
         document.getElementById('department_name').value = department.name;
         document.getElementById('department_code').value = department.code || '';
     } else {
-        // Add mode
         title.textContent = 'Add Department';
         submitBtn.name = 'add_department';
         submitBtn.textContent = 'Add Department';
         form.reset();
         document.getElementById('department_id').value = '';
     }
-    
+
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
 }
 
 function closeDepartmentModal() {
-    document.getElementById('departmentModal').classList.add('hidden');
+    const el = document.getElementById('departmentModal');
+    el.classList.add('hidden');
+    el.classList.remove('flex');
     document.body.style.overflow = 'auto';
 }
 
-function editDepartment(department) {
-    showDepartmentModal(department);
+function editDepartment(id, name, code) {
+    showDepartmentModal({ id: id, name: name, code: code });
 }
 
 // Course Modal Functions
@@ -669,73 +668,79 @@ function showCourseModal(course = null) {
     const form = document.getElementById('courseForm');
     const title = document.getElementById('courseModalTitle');
     const submitBtn = document.getElementById('courseSubmit');
-    
+
     if (course) {
-        // Edit mode
         title.textContent = 'Edit Course';
         submitBtn.name = 'edit_course';
         submitBtn.textContent = 'Update Course';
         document.getElementById('course_id').value = course.id;
-        document.getElementById('course_name').value = course.course_name;
-        document.getElementById('course_code').value = course.course_code || '';
+        document.getElementById('course_name').value = course.name || course.course_name;
+        document.getElementById('course_code').value = course.code || course.course_code || '';
         document.getElementById('department_id_select').value = course.department_id || '';
     } else {
-        // Add mode
         title.textContent = 'Add Course';
         submitBtn.name = 'add_course';
         submitBtn.textContent = 'Add Course';
         form.reset();
         document.getElementById('course_id').value = '';
     }
-    
+
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
 }
 
 function closeCourseModal() {
-    document.getElementById('courseModal').classList.add('hidden');
+    const el = document.getElementById('courseModal');
+    el.classList.add('hidden');
+    el.classList.remove('flex');
     document.body.style.overflow = 'auto';
 }
 
-function editCourse(course) {
-    showCourseModal(course);
+function editCourse(id, course_name, course_code, department_id) {
+    showCourseModal({ id: id, course_name: course_name, course_code: course_code, department_id: department_id });
 }
 
 // Delete Confirmation Functions
 function confirmDeleteDepartment(id, name) {
-    const modal = document.getElementById('deleteModal');
-    const form = document.getElementById('deleteForm');
-    
-    document.getElementById('deleteModalText').textContent = 
+    const modal = document.getElementById('deleteDepartmentModal');
+
+    document.getElementById('deleteModalText').textContent =
         `Are you sure you want to delete the department "${name}"? This action cannot be undone.`;
-    
+
     // Set the department ID in the delete form
     document.getElementById('delete_id').value = id;
-    
+
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
 }
 
 function closeDeleteModal() {
-    document.getElementById('deleteModal').classList.add('hidden');
+    const el = document.getElementById('deleteDepartmentModal');
+    el.classList.add('hidden');
+    el.classList.remove('flex');
     document.body.style.overflow = 'auto';
 }
 
 function confirmDeleteCourse(id, name) {
     const modal = document.getElementById('deleteCourseModal');
-    
-    document.querySelector('#deleteCourseModal p').textContent = 
+
+    document.querySelector('#deleteCourseModal p').textContent =
         `Are you sure you want to delete the course "${name}"? This action cannot be undone.`;
-    
+
     // Set the course ID in the delete form
     document.getElementById('delete_course_id').value = id;
-    
+
     modal.classList.remove('hidden');
+    modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
 }
 
 function closeDeleteCourseModal() {
-    document.getElementById('deleteCourseModal').classList.add('hidden');
+    const el = document.getElementById('deleteCourseModal');
+    el.classList.add('hidden');
+    el.classList.remove('flex');
     document.body.style.overflow = 'auto';
 }
 
@@ -743,7 +748,7 @@ function closeDeleteCourseModal() {
 window.onclick = function(event) {
     const departmentModal = document.getElementById('departmentModal');
     const courseModal = document.getElementById('courseModal');
-    const deleteModal = document.getElementById('deleteModal');
+    const deleteModal = document.getElementById('deleteDepartmentModal');
     const deleteCourseModal = document.getElementById('deleteCourseModal');
     
     if (event.target === departmentModal) {

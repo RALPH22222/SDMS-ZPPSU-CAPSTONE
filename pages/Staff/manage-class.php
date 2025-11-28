@@ -1,5 +1,6 @@
 <?php
   session_start();
+  
   // Basic auth guard
   if (!isset($_SESSION['user_id'])) {
     header('Location: ../Auth/login.php');
@@ -8,29 +9,13 @@
 
   require_once '../../database/database.php';
   require_once '../../includes/helpers.php';
-
+  
+  // Get current user ID from session
   $currentUserId = (int)$_SESSION['user_id'];
 
-  $currentStaffId = null;
-  try {
-    $stf = $pdo->prepare('SELECT id FROM staff WHERE user_id = ? LIMIT 1');
-    $stf->execute([$currentUserId]);
-    $row = $stf->fetch(PDO::FETCH_ASSOC);
-    if ($row && !empty($row['id'])) { 
-      $currentStaffId = (int)$row['id']; 
-    } else {
-      // If not a staff, redirect to home
-      header('Location: /SDMS/index.php');
-      exit;
-    }
-  } catch (Throwable $e) { 
-    // Log error and redirect
-    error_log('Error checking staff status: ' . $e->getMessage());
-    header('Location: /SDMS/index.php');
-    exit;
-  }
 
-  $pageTitle = 'Manage Classes';
+
+  $pageTitle = 'Manage Departments';
 
   // Handle AJAX request for student search
   if (isset($_GET['search_students']) && isset($_GET['q'])) {
@@ -63,33 +48,38 @@
   // Handle form submissions
   if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-      // Remove student from class
+      // Remove student from department
       if (isset($_POST['delete_student'])) {
         $studentId = (int)$_POST['student_id'];
-        $classId = (int)$_POST['class_id'];
+        $deptId = (int)$_POST['dept_id'];
         
         try {
           // Start a transaction
           $pdo->beginTransaction();
           
-          // Verify the student is in the selected class
-          $stmt = $pdo->prepare('SELECT id FROM students WHERE id = ? AND class_id = ?');
-          $stmt->execute([$studentId, $classId]);
+          // Verify the student is in the selected department
+          $stmt = $pdo->prepare('SELECT s.id 
+                               FROM students s 
+                               JOIN courses co ON s.course_id = co.id 
+                               JOIN departments d ON co.department_id = d.id
+                               JOIN marshal m ON d.id = m.department_id
+                               WHERE s.id = ? AND m.user_id = ?');
+          $stmt->execute([$studentId, $currentUserId]);
           
           if ($stmt->rowCount() > 0) {
-            // Update the student's class_id to NULL to remove them from the class
-            $updateStmt = $pdo->prepare('UPDATE students SET class_id = NULL WHERE id = ?');
+            // Update the student's course_id to NULL to remove them from the department
+            $updateStmt = $pdo->prepare('UPDATE students SET course_id = NULL WHERE id = ?');
             $updateStmt->execute([$studentId]);
             
             if ($updateStmt->rowCount() > 0) {
               $pdo->commit();
-              $_SESSION['success'] = 'Student successfully removed from the class';
+              $_SESSION['success'] = 'Student successfully removed from the department';
             } else {
               $pdo->rollBack();
-              $_SESSION['error'] = 'Failed to remove student from class';
+              $_SESSION['error'] = 'Failed to remove student from department';
             }
           } else {
-            $_SESSION['error'] = 'Student not found in this class';
+            $_SESSION['error'] = 'Student not found in this department';
           }
         } catch (PDOException $e) {
           $pdo->rollBack();
@@ -107,7 +97,7 @@
           exit;
         }
         
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?class_id=' . $classId);
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?dept_id=' . $deptId);
         exit;
       }
       if (isset($_POST['add_student'])) {
@@ -115,11 +105,11 @@
         
         try {
           $studentId = isset($_POST['student_id']) ? (int)$_POST['student_id'] : null;
-          $classId = (int)$_POST['class_id'];
+          $deptId = (int)$_POST['dept_id'];
           
           // Validate required fields
           if (empty($_POST['student_number']) || empty($_POST['first_name']) || 
-              empty($_POST['last_name']) || empty($_POST['class_id'])) {
+              empty($_POST['last_name']) || empty($_POST['dept_id'])) {
               throw new Exception("All fields are required");
           }
 
@@ -132,23 +122,41 @@
           $existingStudent = $checkStmt->fetch(PDO::FETCH_ASSOC);
           
           if ($existingStudent) {
-              // Update existing student's class
-              $updateStmt = $pdo->prepare('UPDATE students SET class_id = ? WHERE student_number = ?');
-              $updateStmt->execute([$classId, trim($_POST['student_number'])]);
+              // Update existing student's department
+              // First get a class from the selected department
+              $classStmt = $pdo->prepare('SELECT id FROM classes WHERE department_id = ? LIMIT 1');
+              $classStmt->execute([$deptId]);
+              $class = $classStmt->fetch(PDO::FETCH_ASSOC);
+              
+              if ($class) {
+                $updateStmt = $pdo->prepare('UPDATE students SET class_id = ? WHERE student_number = ?');
+                $updateStmt->execute([$class['id'], trim($_POST['student_number'])]);
+              } else {
+                throw new Exception('No classes found in the selected department');
+              }
           } else {
-              // Insert new student
-              $insertStmt = $pdo->prepare('INSERT INTO students (student_number, first_name, last_name, class_id) 
-                                         VALUES (?, ?, ?, ?)');
-              $insertStmt->execute([
-                  trim($_POST['student_number']),
-                  trim($_POST['first_name']),
-                  trim($_POST['last_name']),
-                  $classId
-              ]);
+              // Insert new student with a class from the selected department
+              // First get a class from the selected department
+              $classStmt = $pdo->prepare('SELECT id FROM classes WHERE department_id = ? LIMIT 1');
+              $classStmt->execute([$deptId]);
+              $class = $classStmt->fetch(PDO::FETCH_ASSOC);
+              
+              if ($class) {
+                $insertStmt = $pdo->prepare('INSERT INTO students (student_number, first_name, last_name, class_id) 
+                                           VALUES (?, ?, ?, ?)');
+                $insertStmt->execute([
+                    trim($_POST['student_number']),
+                    trim($_POST['first_name']),
+                    trim($_POST['last_name']),
+                    $class['id']
+                ]);
+              } else {
+                throw new Exception('No classes found in the selected department');
+              }
           }
           
           $pdo->commit();
-          $_SESSION['success'] = 'Student successfully added to class';
+          $_SESSION['success'] = 'Student successfully added to department';
           
         } catch (Exception $e) {
             $pdo->rollBack();
@@ -156,64 +164,130 @@
             $_SESSION['error'] = $e->getMessage();
         }
         
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?class_id=' . $classId);
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?dept_id=' . $deptId);
         exit;
       }
       if (isset($_POST['update_student'])) {
-        $stmt = $pdo->prepare('UPDATE students SET student_number = ?, first_name = ?, last_name = ?, class_id = ? WHERE id = ?');
+        // For department management, we don't update the class_id directly
+        // as it's managed through the department selection
+        $stmt = $pdo->prepare('UPDATE students SET student_number = ?, first_name = ?, last_name = ? WHERE id = ?');
         $stmt->execute([
           e($_POST['student_number']),
           e($_POST['first_name']),
           e($_POST['last_name']),
-          (int)$_POST['class_id'],
           (int)$_POST['student_id']
         ]);
         
         $_SESSION['success'] = 'Student updated successfully';
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?class_id=' . (int)$_POST['class_id']);
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?dept_id=' . (int)$_POST['dept_id']);
         exit;
       }
       
       // Delete student
       if (isset($_POST['delete_student'])) {
-        $stmt = $pdo->prepare('DELETE FROM students WHERE id = ?');
-        $stmt->execute([(int)$_POST['student_id']]);
+        // Instead of deleting, we'll just remove the student from the department
+        $updateStmt = $pdo->prepare('UPDATE students SET class_id = NULL WHERE id = ?');
+        $updateStmt->execute([(int)$_POST['student_id']]);
         
-        $_SESSION['success'] = 'Student deleted successfully';
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?class_id=' . (int)$_POST['class_id']);
+        $_SESSION['success'] = 'Student removed from department successfully';
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?dept_id=' . (int)$_POST['dept_id']);
         exit;
       }
     } catch (PDOException $e) {
       error_log('Database error: ' . $e->getMessage());
       $_SESSION['error'] = 'An error occurred. Please try again.';
-      header('Location: ' . $_SERVER['PHP_SELF'] . (isset($_GET['class_id']) ? '?class_id=' . (int)$_GET['class_id'] : ''));
+      header('Location: ' . $_SERVER['PHP_SELF'] . (isset($_GET['dept_id']) ? '?dept_id=' . (int)$_GET['dept_id'] : ''));
       exit;
     }
   }
 
-  // Get staff's assigned classes
-  $classes = [];
+  // Debug: Log the current user ID
+  error_log("Current user ID: " . $currentUserId);
+  
+  // Get the current user's department with department details in a single query
+  $departments = [];
   try {
-    $stmt = $pdo->prepare('SELECT * FROM classes WHERE adviser_staff_id = ?');
-    $stmt->execute([$currentStaffId]);
-    $classes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // First, check if the marshal record exists
+    $checkMarshal = $pdo->prepare("SELECT * FROM marshal WHERE user_id = ?");
+    $checkMarshal->execute([$currentUserId]);
+    $marshalData = $checkMarshal->fetch(PDO::FETCH_ASSOC);
+    
+    error_log("Marshal data: " . print_r($marshalData, true));
+    
+    if ($marshalData) {
+      // Check if department_id is set
+      if (isset($marshalData['department_id'])) {
+        error_log("Department ID found: " . $marshalData['department_id']);
+        
+        // Get department details
+        $query = "SELECT 
+                    d.id AS department_id,
+                    d.department_name,
+                    d.abbreviation
+                  FROM departments d 
+                  WHERE d.id = ?";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->execute([$marshalData['department_id']]);
+        $department = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        error_log("Department data: " . print_r($department, true));
+        
+        if ($department) {
+          // Format the department data to match the expected structure
+          $departments[] = [
+            'id' => $department['department_id'],
+            'department_name' => $department['department_name'],
+            'abbreviation' => $department['abbreviation']
+          ];
+          error_log("Successfully loaded department: " . $department['department_name']);
+        } else {
+          $_SESSION['error'] = 'Your assigned department (ID: ' . $marshalData['department_id'] . ') was not found in the departments table.';
+          error_log("Department not found with ID: " . $marshalData['department_id']);
+        }
+      } else {
+        $_SESSION['error'] = 'You are not assigned to any department. Please contact the administrator to assign you to a department.';
+        error_log("No department_id found for marshal with user_id: " . $currentUserId);
+      }
+    } else {
+      $_SESSION['error'] = 'No marshal record found for your account. Please contact the administrator.';
+      error_log("No marshal record found for user_id: " . $currentUserId);
+    }
   } catch (PDOException $e) {
-    error_log('Error fetching classes: ' . $e->getMessage());
-    $error = 'Failed to load classes. Please try again.';
+    error_log('Error fetching department information: ' . $e->getMessage());
+    $_SESSION['error'] = 'Failed to load department information. Please try again or contact the administrator.';
+    $error = 'Failed to load department information. Please try again.';
   }
 
-  // Get students in the selected class
-  $selectedClassId = isset($_GET['class_id']) ? (int)$_GET['class_id'] : null;
+  // Get students in the selected department
+  $selectedDeptId = isset($_GET['dept_id']) ? (int)$_GET['dept_id'] : null;
   $students = [];
   
-  if ($selectedClassId) {
+  if ($selectedDeptId) {
     try {
-      $stmt = $pdo->prepare('SELECT * FROM students WHERE class_id = ?');
-      $stmt->execute([$selectedClassId]);
+      $query = "SELECT 
+                  s.id,
+                  s.student_number,
+                  CONCAT(s.first_name, ' ', s.last_name) AS full_name,
+                  co.course_name,
+                  d.department_name
+                FROM students s
+                JOIN courses co ON s.course_id = co.id
+                JOIN departments d ON co.department_id = d.id
+                JOIN marshal m ON d.id = m.department_id
+                WHERE m.user_id = ?
+                ORDER BY s.last_name, s.first_name ASC";
+      
+      $stmt = $pdo->prepare($query);
+      $stmt->execute([$currentUserId]);
       $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+      
+      // Debug: Log the query and results
+      error_log("Student query executed. Found " . count($students) . " students for user ID: " . $currentUserId);
+      
     } catch (PDOException $e) {
       error_log('Error fetching students: ' . $e->getMessage());
-      $error = 'Failed to load students. Please try again.';
+      $error = 'Failed to load students. Please try again. Error: ' . $e->getMessage();
     }
   }
 
@@ -259,85 +333,36 @@
           }
           ?>
           
-          <!-- Class Selection -->
+          <!-- Department Selection -->
           <div class="bg-white shadow rounded-lg p-6 mb-6">
-            <h2 class="text-lg font-medium text-gray-900 mb-4">Select Class</h2>
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Select Department</h2>
             <div class="flex flex-wrap gap-4">
-              <?php foreach ($classes as $class): ?>
-                <a href="?class_id=<?php echo e($class['id']); ?>" 
-                   class="px-4 py-2 rounded-md text-sm font-medium <?php echo ($selectedClassId == $class['id']) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'; ?>">
-                  <?php echo e($class['class_name']); ?>
+              <?php foreach ($departments as $dept): ?>
+                <a href="?dept_id=<?php echo e($dept['id']); ?>" 
+                   class="px-4 py-2 rounded-md text-sm font-medium <?php echo ($selectedDeptId == $dept['id']) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'; ?>">
+                  <?php echo e($dept['department_name']); ?>
                 </a>
               <?php endforeach; ?>
             </div>
           </div>
 
-                    <?php if ($selectedClassId): ?>
-                        <div class="bg-white shadow rounded-lg p-6 mb-6">
-                            <h2 class="text-lg font-medium text-gray-900 mb-4">Add New Student</h2>
-                            <form method="POST" class="space-y-4">
-                                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                            <div class="relative md:col-span-2">
-                                <label for="student_search" class="block text-sm font-medium text-gray-700">Search Student</label>
-                                <input type="text" id="student_search" autocomplete="off"
-                                       class="mt-1 block w-full h-[38px] px-3 py-2 rounded-md border border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                                       placeholder="Type to search..."
-                                       style="min-width: 250px;">
-                                <div id="student_suggestions" class="hidden absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-sm ring-1 ring-black ring-opacity-5 overflow-auto">
-                                </div>
-                            </div>
-                            <input type="hidden" name="student_id" id="student_id">
-                            <div class="relative">
-                                <label for="student_number" class="block text-sm font-medium text-gray-700">Student Number</label>
-                                <div class="mt-1 relative rounded-md">
-                                    <input type="text" name="student_number" id="student_number" required readonly
-                                           class="block w-full rounded-md border-gray-300 bg-gray-100 pl-3 pr-10 py-2 text-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                                           placeholder="Auto-filled"
-                                           style="cursor: not-allowed;">
-                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <i class="fa-solid fa-lock text-gray-400"></i>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="relative">
-                                <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
-                                <div class="mt-1 relative rounded-md">
-                                    <input type="text" name="first_name" id="first_name" required readonly
-                                           class="block w-full rounded-md border-gray-300 bg-gray-100 pl-3 pr-10 py-2 text-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                                           placeholder="Auto-filled"
-                                           style="cursor: not-allowed;">
-                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <i class="fa-solid fa-lock text-gray-400"></i>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="relative">
-                                <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
-                                <div class="mt-1 relative rounded-md">
-                                    <input type="text" name="last_name" id="last_name" required readonly
-                                           class="block w-full rounded-md border-gray-300 bg-gray-100 pl-3 pr-10 py-2 text-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                                           placeholder="Auto-filled"
-                                           style="cursor: not-allowed;">
-                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                        <i class="fa-solid fa-lock text-gray-400"></i>
-                                    </div>
-                                </div>
-                            </div>
-                                    <input type="hidden" name="class_id" value="<?php echo e($selectedClassId); ?>">
-                                    <div class="flex items-end">
-                                        <button type="submit" name="add_student"
-                                                class="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                                            Add Student
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-
-                        <!-- Students List -->
+                    <?php if ($selectedDeptId): ?>
                         <div class="bg-white shadow rounded-lg overflow-hidden">
-                            <div class="px-6 py-4 border-b border-gray-200">
-                                <h2 class="text-lg font-medium text-gray-900">Students in Class</h2>
+                            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                                <h2 class="text-lg font-medium text-gray-900">Students in Department</h2>
+                                <div class="w-64">
+                                    <label for="student_search" class="sr-only">Search students</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <input type="text" id="student_search" name="student_search" 
+                                               class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm" 
+                                               placeholder="Search students...">
+                                    </div>
+                                </div>
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="min-w-full divide-y divide-gray-200">
@@ -351,7 +376,7 @@
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         <?php if (empty($students)): ?>
                                             <tr>
-                                                <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">No students found in this class.</td>
+                                                <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">No students found in this department.</td>
                                             </tr>
                                         <?php else: ?>
                                             <?php foreach ($students as $student): ?>
@@ -360,20 +385,23 @@
                                                         <?php echo e($student['student_number']); ?>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo e($student['first_name'] . ' ' . $student['last_name']); ?>
+                                                        <?php echo e($student['full_name'] ?? 'N/A'); ?>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        <?php echo e($student['course_name'] ?? 'N/A'); ?>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                                         <button onclick="editStudent(<?php echo e(str_replace('"', '&quot;', json_encode($student))); ?>)" 
                                                                 class="text-primary hover:text-primary-700">
                                                             <i class="fas fa-edit"></i> Edit
                                                         </button>
-                                                        <button type="button" onclick="confirmDelete(<?php echo e($student['id']); ?>, '<?php echo e(addslashes($student['first_name'] . ' ' . $student['last_name'])); ?>')" 
+                                                        <button type="button" onclick="confirmDelete(<?php echo e($student['id']); ?>, '<?php echo e(addslashes($student['full_name'] ?? 'this student')); ?>')" 
                                                                 class="text-red-600 hover:text-red-900 ml-4">
                                                             <i class="fas fa-trash"></i> Delete
                                                         </button>
                                                         <form id="delete-form-<?php echo e($student['id']); ?>" action="" method="POST" class="hidden">
                                                             <input type="hidden" name="student_id" value="<?php echo e($student['id']); ?>">
-                                                            <input type="hidden" name="class_id" value="<?php echo e($selectedClassId); ?>">
+                                                            <input type="hidden" name="dept_id" value="<?php echo e($selectedDeptId); ?>">
                                                             <input type="hidden" name="delete_student" value="1">
                                                         </form>
                                                     </td>
@@ -402,7 +430,7 @@
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">Edit Student</h3>
                     <div class="space-y-4">
                         <input type="hidden" name="student_id" id="edit_student_id">
-                        <input type="hidden" name="class_id" value="<?php echo e($selectedClassId); ?>">
+                        <input type="hidden" name="dept_id" value="<?php echo e($selectedDeptId); ?>">
                         
                         <div>
                             <label for="edit_student_number" class="block text-sm font-medium text-gray-700">Student Number</label>
@@ -442,11 +470,29 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Function to open the edit modal with student data
     window.editStudent = function(student) {
+        // Set the student ID and number
         document.getElementById('edit_student_id').value = student.id;
-        document.getElementById('edit_student_number').value = student.student_number;
-        document.getElementById('edit_first_name').value = student.first_name;
-        document.getElementById('edit_last_name').value = student.last_name;
+        document.getElementById('edit_student_number').value = student.student_number || '';
         
+        // Handle full_name if first_name and last_name are not available
+        if (student.first_name && student.last_name) {
+            document.getElementById('edit_first_name').value = student.first_name;
+            document.getElementById('edit_last_name').value = student.last_name;
+        } else if (student.full_name) {
+            // Split full_name into first and last names
+            const names = student.full_name.trim().split(/\s+/);
+            const lastName = names.pop() || '';
+            const firstName = names.join(' ') || '';
+            
+            document.getElementById('edit_first_name').value = firstName;
+            document.getElementById('edit_last_name').value = lastName;
+        } else {
+            // Fallback if no name data is available
+            document.getElementById('edit_first_name').value = '';
+            document.getElementById('edit_last_name').value = '';
+        }
+        
+        // Show the modal
         const modal = document.getElementById('editStudentModal');
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
@@ -633,6 +679,23 @@ document.addEventListener('DOMContentLoaded', function() {
             suggestionsContainer?.classList.add('hidden');
         }
     });
+    // Function to filter students based on search input
+    function filterStudents(searchTerm) {
+        const searchTermLower = searchTerm.toLowerCase();
+        const rows = document.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+            const name = row.cells[1].textContent.toLowerCase();
+            const studentNumber = row.cells[0].textContent.toLowerCase();
+            
+            if (name.includes(searchTermLower) || studentNumber.includes(searchTermLower)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
     // Form validation
     const form = document.querySelector('form[name="add_student"]');
     if (form) {
@@ -666,6 +729,35 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Submit the form
             form.submit();
+        });
+    }
+});
+
+// Student search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('student_search');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                // Skip header rows if any
+                if (row.querySelector('th')) return;
+                
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    const studentNumber = cells[0]?.textContent?.toLowerCase() || '';
+                    const name = cells[1]?.textContent?.toLowerCase() || '';
+                    
+                    if (studentNumber.includes(searchTerm) || name.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
         });
     }
 });

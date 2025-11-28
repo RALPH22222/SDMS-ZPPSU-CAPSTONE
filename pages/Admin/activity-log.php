@@ -35,10 +35,10 @@
   if ($page > $totalPages) { $page = $totalPages; $offset = ($page - 1) * $pageSize; }
   $sql = "
     SELECT at.*, u.username, u.email,
-           CONCAT(COALESCE(s.first_name,''),' ',COALESCE(s.last_name,'')) AS staff_name
+           CONCAT(COALESCE(m.first_name,''),' ',COALESCE(m.last_name,'')) AS staff_name
     FROM audit_trail at
     LEFT JOIN users u ON u.id = at.performed_by_user_id
-    LEFT JOIN staff s ON s.user_id = u.id
+    LEFT JOIN marshal m ON m.user_id = u.id
     $whereSql
     ORDER BY at.created_at DESC
     LIMIT :limit OFFSET :offset
@@ -53,10 +53,10 @@
   $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
   $tables = $pdo->query("SELECT DISTINCT table_name FROM audit_trail ORDER BY table_name")->fetchAll(PDO::FETCH_COLUMN);
   $actions = $pdo->query("SELECT DISTINCT action FROM audit_trail ORDER BY action")->fetchAll(PDO::FETCH_COLUMN);
-  $users = $pdo->query("SELECT DISTINCT u.id AS id, COALESCE(CONCAT(s.first_name,' ',s.last_name), u.username, u.email) AS name
+  $users = $pdo->query("SELECT DISTINCT u.id AS id, COALESCE(CONCAT(m.first_name,' ',m.last_name), u.username, u.email) AS name
                         FROM audit_trail at
                         LEFT JOIN users u ON u.id = at.performed_by_user_id
-                        LEFT JOIN staff s ON s.user_id = u.id
+                        LEFT JOIN marshal m ON m.user_id = u.id
                         WHERE at.performed_by_user_id IS NOT NULL
                         ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 ?>

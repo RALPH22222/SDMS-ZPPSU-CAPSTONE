@@ -347,12 +347,7 @@ include __DIR__ . '/../../components/student-head.php';
                   <textarea name="reason" rows="4" required class="mt-1 block w-full border-gray-200 rounded" placeholder="Explain why you are appealing..."></textarea>
                 </div>
 
-                <div>
-                  <label class="block text-sm font-medium text-gray-700">Attach image (optional)</label>
-                  <input id="attachmentInput" type="file" name="attachment" accept="image/*" class="mt-1 block w-full text-sm text-gray-700"/>
-                  <p class="text-xs text-gray-500 mt-1">Allowed: JPG, PNG, GIF, WEBP. Max 5MB. (Only used as supporting evidence.)</p>
-                </div>
-
+                
                 <div class="flex items-center gap-3">
                   <button id="submitAppealBtn" type="submit" name="submit_appeal" class="px-4 py-2 bg-primary text-white rounded">Submit Appeal</button>
                 </div>

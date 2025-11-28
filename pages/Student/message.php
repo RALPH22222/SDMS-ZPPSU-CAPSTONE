@@ -26,6 +26,24 @@ if ($studentId === 0) {
   }
 }
 
+// Resolve the student's department_id via students -> courses -> departments
+$studentDeptId = null;
+try {
+  $deptStmt = $pdo->prepare('
+    SELECT d.id AS department_id
+    FROM users u
+    JOIN students s ON s.user_id = u.id
+    JOIN courses c ON c.id = s.course_id
+    JOIN departments d ON d.id = c.department_id
+    WHERE u.id = :uid
+    LIMIT 1
+  ');
+  $deptStmt->execute([':uid' => $studentId]);
+  $studentDeptId = $deptStmt->fetchColumn() ?: null;
+} catch (Throwable $e) {
+  // ignore; remains null
+}
+
 function jsonResponse($data, $code = 200) {
   http_response_code($code);
   header('Content-Type: application/json');
@@ -38,22 +56,27 @@ if (isset($_GET['action'])) {
   $action = $_GET['action'];
   try {
     if ($action === 'list_users') {
-      // List Staff users only (role_id = 5), show unread counts of messages sent to this student
+      // List users under the student's department only; show unread counts of messages sent to this student
       $q = trim($_GET['q'] ?? '');
-      // Allow messaging any active user (exclude self)
-      $params = [':me' => $studentId];
-      $where = 'WHERE u.is_active = 1 AND u.id != :me';
+      // If department cannot be resolved, return empty list
+      if (!$studentDeptId) {
+        jsonResponse(['ok' => true, 'users' => []]);
+      }
+      // Allow messaging any active user in same department (exclude self)
+      $params = [':me' => $studentId, ':dept' => $studentDeptId];
+      $where = 'WHERE u.is_active = 1 AND u.id != :me AND mr.department_id = :dept';
       if ($q !== '') {
         $where .= ' AND (u.username LIKE :q OR u.email LIKE :q)';
         $params[':q'] = "%$q%";
       }
       $sql = "
         SELECT u.id, u.username, u.email,
-               COALESCE(SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END), 0) AS unread
+               COALESCE(SUM(CASE WHEN msg.is_read = 0 THEN 1 ELSE 0 END), 0) AS unread
         FROM users u
-        LEFT JOIN messages m
-          ON m.sender_user_id = u.id
-         AND m.recipient_user_id = :me
+        JOIN marshal mr ON mr.user_id = u.id
+        LEFT JOIN messages msg
+          ON msg.sender_user_id = u.id
+         AND msg.recipient_user_id = :me
         $where
         GROUP BY u.id, u.username, u.email
         ORDER BY unread DESC, u.username ASC
@@ -71,10 +94,17 @@ if (isset($_GET['action'])) {
         jsonResponse(['ok' => false, 'error' => 'Invalid user.'], 400);
       }
 
-      // Ensure the counterpart exists and is active (allow any role)
+      // Ensure the counterpart exists, is active, and is in the same department
       try {
-        $chk = $pdo->prepare('SELECT id FROM users WHERE id = :id AND is_active = 1 LIMIT 1');
-        $chk->execute([':id' => $withId]);
+        if (!$studentDeptId) {
+          jsonResponse(['ok' => false, 'error' => 'Department not set.'], 403);
+        }
+        $chk = $pdo->prepare('SELECT u.id
+          FROM users u
+          JOIN marshal mr ON mr.user_id = u.id
+          WHERE u.id = :id AND u.is_active = 1 AND mr.department_id = :dept
+          LIMIT 1');
+        $chk->execute([':id' => $withId, ':dept' => $studentDeptId]);
         if (!$chk->fetchColumn()) {
           jsonResponse(['ok' => false, 'error' => 'User not found.'], 404);
         }
@@ -129,9 +159,16 @@ if (isset($_GET['action'])) {
         jsonResponse(['ok' => false, 'error' => 'Message cannot be empty.'], 400);
       }
 
-      // Ensure recipient exists and is active (allow any role)
-      $chk = $pdo->prepare('SELECT id FROM users WHERE id = :id AND is_active = 1 LIMIT 1');
-      $chk->execute([':id' => $to]);
+      // Ensure recipient exists, is active, and is in the same department
+      if (!$studentDeptId) {
+        jsonResponse(['ok' => false, 'error' => 'Department not set.'], 403);
+      }
+      $chk = $pdo->prepare('SELECT u.id
+        FROM users u
+        JOIN marshal mr ON mr.user_id = u.id
+        WHERE u.id = :id AND u.is_active = 1 AND mr.department_id = :dept
+        LIMIT 1');
+      $chk->execute([':id' => $to, ':dept' => $studentDeptId]);
       if (!$chk->fetchColumn()) {
         jsonResponse(['ok' => false, 'error' => 'Recipient not found.'], 404);
       }

@@ -12,9 +12,6 @@
     if ($roleCount === 0) {
       $seed = [
         ['Admin', 'Full access to admin panel'],
-        ['Staff', 'Manage cases, violations, and reports'],
-        ['Teacher', 'Limited staff operations'],
-        ['Parent', 'Parent portal access'],
         ['Student', 'Student portal access'],
       ];
       $ins = $pdo->prepare('INSERT INTO roles (id, name, description, created_at) VALUES (NULL, ?, ?, CURRENT_TIMESTAMP())');
@@ -22,7 +19,7 @@
     }
   } catch (Exception $e) {
   }
-
+  
   $flash = ['type' => null, 'msg' => null];
   if (!empty($_SESSION['flash']) && is_array($_SESSION['flash'])) {
     $flash = $_SESSION['flash'];
@@ -45,6 +42,7 @@
       $action = $_POST['action'] ?? '';
 
       if ($action === 'create_user') {
+        header('Content-Type: application/json');
         try {
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $pdo->beginTransaction();
@@ -106,7 +104,7 @@
             }
             
             // For parent role, validate student relationship
-            if ($role['name'] === 'Parent') {
+            if ($role_id == 4) { // Parent role ID is 4
                 $student_id = (int)($_POST['student_id'] ?? 0);
                 $relationship = trim($_POST['relationship'] ?? '');
                 
@@ -154,69 +152,168 @@
             $user_id = $pdo->lastInsertId();
             
             // Handle role-specific data
-            if ($role['name'] === 'Student') {
-                // Generate a student number (format: YY-XXXX)
-                $current_year = date('y');
-                $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-                $student_number = $current_year . '-' . $random_number;
-                $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
-                $address = trim($_POST['address'] ?? '');
-                $course_id = (int)($_POST['course_id'] ?? 0);
-                
-                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
-                $studentStmt->execute([
-                    $user_id, 
-                    $student_number, 
-                    $first_name,
-                    $middle_name ?: null,
-                    $last_name,
-                    $suffix ?: null,
-                    $birthdate,
-                    $address,
-                    $course_id
-                ]);
-                
-                
-            } elseif ($role['name'] === 'Parent') {
-                $student_id = (int)$_POST['student_id'];
-                $relationship = trim($_POST['relationship']);
-                
-                // Create parent-student relationship
-                $parentStmt = $pdo->prepare('INSERT INTO parent_student (parent_user_id, student_id, relationship, created_at) 
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP())');
-                $parentStmt->execute([$user_id, $student_id, $relationship]);
-                
-                error_log("Created parent-student relationship: parent_user_id=$user_id, student_id=$student_id, relationship=$relationship");
-                
-            } elseif (in_array($role['name'], ['Staff', 'Teacher'])) {
+            if ($role_id == 3) { // Student role ID is 3
+                try {
+                    // First, ensure the user was created successfully
+                    if (!$user_id) {
+                        throw new Exception('Failed to create user account. Cannot create student record.');
+                    }
+                    
+                    // Validate required student fields
+                    $requiredFields = [
+                        'birthdate' => 'Birthdate',
+                        'address' => 'Address',
+                        'course_id' => 'Course',
+                        'sex' => 'Sex'
+                    ];
+                    
+                    $missingFields = [];
+                    foreach ($requiredFields as $field => $name) {
+                        if (empty($_POST[$field])) {
+                            $missingFields[] = $name;
+                        }
+                    }
+                    
+                    if (!empty($missingFields)) {
+                        throw new Exception('The following student fields are required: ' . implode(', ', $missingFields));
+                    }
+                    
+                    // Generate a student number (format: YY-XXXX)
+                    $current_year = date('y');
+                    $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                    $student_number = $current_year . '-' . $random_number;
+                    
+                    // Format and validate birthdate
+                    $birthdate = date('Y-m-d', strtotime($_POST['birthdate']));
+                    if ($birthdate === '1970-01-01' || $birthdate === false) {
+                        throw new Exception('Invalid birthdate format. Please use YYYY-MM-DD.');
+                    }
+                    
+                    $address = trim($_POST['address']);
+                    $course_id = (int)$_POST['course_id'];
+                    $sex = trim($_POST['sex']);
+                    
+                    // Log the data we're about to insert
+                    error_log("Creating student with data: " . print_r([
+                        'user_id' => $user_id,
+                        'student_number' => $student_number,
+                        'first_name' => $first_name,
+                        'last_name' => $last_name,
+                        'course_id' => $course_id,
+                        'birthdate' => $birthdate,
+                        'sex' => $sex,
+                        'address' => $address
+                    ], true));
+                    
+                    // Insert into students table
+                    $studentStmt = $pdo->prepare('INSERT INTO students (
+                        user_id, student_number, first_name, middle_name, last_name, 
+                        suffix, birthdate, address, course_id, sex, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())');
+                    
+                    $result = $studentStmt->execute([
+                        $user_id, 
+                        $student_number, 
+                        $first_name,
+                        !empty($middle_name) ? $middle_name : null,
+                        $last_name,
+                        !empty($suffix) ? $suffix : null,
+                        $birthdate,
+                        $address,
+                        $course_id > 0 ? $course_id : null,
+                        $sex
+                    ]);
+                    
+                    if (!$result) {
+                        $errorInfo = $studentStmt->errorInfo();
+                        throw new Exception('Database error when creating student: ' . ($errorInfo[2] ?? 'Unknown error'));
+                    }
+                    
+                    // Update the user's username to match the student number
+                    $updateUser = $pdo->prepare('UPDATE users SET username = ? WHERE id = ?');
+                    $updateResult = $updateUser->execute([$student_number, $user_id]);
+                    
+                    if (!$updateResult) {
+                        throw new Exception('Failed to update username with student number.');
+                    }
+                    
+                    error_log("Successfully created student record for user_id: $user_id, student_number: $student_number");
+                    
+                } catch (Exception $e) {
+                    // Log the error
+                    error_log("Error creating student: " . $e->getMessage());
+                    
+                    // Re-throw the exception to be caught by the outer try-catch
+                    throw $e;
+                }
+            } elseif ($role_id === 2 || $role_id === 5 || $role_id === 6) {
+                // Handle Staff (2), Marshal (5), or Teacher (6) roles
                 $staff_number = trim($_POST['staff_number'] ?? '');
                 $department = trim($_POST['department'] ?? '');
                 $position = trim($_POST['position'] ?? '');
                 
                 if (empty($staff_number) || empty($department) || empty($position)) {
-                    throw new Exception('Staff number, department, and position are required for staff/teacher accounts.');
+                    throw new Exception('Staff number, department, and position are required for staff/teacher/marshal accounts.');
                 }
                 
-                $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, staff_number, first_name, middle_name, last_name, suffix, department, position, created_at) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
-                $staffStmt->execute([
-                    $user_id,
-                    $staff_number,
-                    $first_name,
-                    $middle_name ?: null,
-                    $last_name,
-                    $suffix ?: null,
-                    $department,
-                    $position
-                ]);
+                // Update user with staff/teacher/marshal information
+                // Combine first and last name into username if both are provided
+                $username = trim("$first_name $last_name");
+                $updateUser = $pdo->prepare('UPDATE users SET username = ? WHERE id = ?');
+                $updateUser->execute([$username, $user_id]);
                 
-                error_log("Created staff/teacher record with user_id: $user_id, staff_number: $staff_number");
+                // Handle Marshal-specific insertion into marshal table
+                if ($role_id === 5) {
+                    // Look up department_id from department_name
+                    $deptStmt = $pdo->prepare('SELECT id FROM departments WHERE department_name = ?');
+                    $deptStmt->execute([$department]);
+                    $deptResult = $deptStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$deptResult) {
+                        throw new Exception('Department not found. Please select a valid department.');
+                    }
+                    
+                    $department_id = (int)$deptResult['id'];
+                    
+                    // Check if department already has a marshal (unique constraint)
+                    $existingMarshalStmt = $pdo->prepare('SELECT id FROM marshal WHERE department_id = ?');
+                    $existingMarshalStmt->execute([$department_id]);
+                    if ($existingMarshalStmt->fetch()) {
+                        throw new Exception('This department already has a marshal assigned. Please select a different department.');
+                    }
+                    
+                    // Insert into marshal table
+                    $marshalStmt = $pdo->prepare('INSERT INTO marshal (
+                        user_id, staff_number, first_name, middle_name, last_name, 
+                        suffix, position, department_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                    
+                    $marshalResult = $marshalStmt->execute([
+                        $user_id,
+                        $staff_number,
+                        $first_name,
+                        !empty($middle_name) ? $middle_name : null,
+                        $last_name,
+                        !empty($suffix) ? $suffix : null,
+                        $position,
+                        $department_id
+                    ]);
+                    
+                    if (!$marshalResult) {
+                        $errorInfo = $marshalStmt->errorInfo();
+                        throw new Exception('Database error when creating marshal: ' . ($errorInfo[2] ?? 'Unknown error'));
+                    }
+                    
+                    error_log("Created marshal record for user_id: $user_id, staff_number: $staff_number, department_id: $department_id");
+                }
+                
+                error_log("Updated staff/teacher/marshal user with user_id: $user_id, name: $first_name $last_name, role_id: $role_id");
             }
             
             $pdo->commit();
-            $_SESSION['flash'] = flash('success', 'User created successfully.');
+            echo json_encode(['success' => true, 'message' => 'User created successfully']);
             error_log("User created successfully with ID: $user_id");
+            exit;
         } catch (PDOException $e) {
             $pdo->rollBack();
             error_log("Database error: " . $e->getMessage());
@@ -226,7 +323,9 @@
                 $pdo->rollBack();
             }
             error_log("Error creating user: " . $e->getMessage());
-            throw $e;
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
         }
         
         header('Location: ' . basename($_SERVER['PHP_SELF']));
@@ -234,6 +333,7 @@
       }
 
       if ($action === 'update_user') {
+        header('Content-Type: application/json');
         $pdo->beginTransaction();
         try {
             $id = (int)($_POST['id'] ?? 0);
@@ -263,20 +363,23 @@
             }
             
             $current_role_id = (int)$currentData['role_id'];
-            $is_teacher_now = ($role_id == 6); // Teacher role ID is 6
-            $was_teacher = ($current_role_id == 6);
             $is_student_now = ($role_id == 3); // Student role ID is 3
             $was_student = ($current_role_id == 3);
+            $is_teacher_now = ($role_id == 2); // Staff/Teacher role ID is 2
+            $was_teacher = ($current_role_id == 2);
+            $is_marshal_now = ($role_id == 5); // Marshal role ID is 5
+            $was_marshal = ($current_role_id == 5);
             
             // Handle role changes using posted first_name/last_name instead of username parsing
             if ($is_teacher_now && !$was_teacher) {
-                // Role changed to teacher - create staff record
-                $s_first = $first_name !== '' ? $first_name : 'Teacher';
-                $s_last = $last_name !== '' ? $last_name : 'User';
-
-                $staffStmt = $pdo->prepare('INSERT INTO staff (user_id, first_name, last_name, department, position, created_at) VALUES (?, ?, ?, "Faculty", "Teacher", CURRENT_TIMESTAMP())');
-                $staffStmt->execute([$id, $s_first, $s_last]);
-                error_log("Created staff record for teacher with user_id: $id, name: $s_first $s_last");
+                // Role changed to teacher - update username
+                $username = trim("$first_name $last_name");
+                if (empty($username)) {
+                    $username = 'Teacher' . $id;  // Fallback to Teacher + ID if no name provided
+                }
+                $updateUser = $pdo->prepare('UPDATE users SET username = ? WHERE id = ?');
+                $updateUser->execute([$username, $id]);
+                error_log("Updated teacher user with user_id: $id, username: $username");
             } 
             // Handle role change to student
             elseif ($is_student_now && !$was_student) {
@@ -286,12 +389,13 @@
                 $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
                 $address = trim($_POST['address'] ?? '');
                 $course_id = (int)($_POST['course_id'] ?? 0);
+                $sex = trim($_POST['sex'] ?? '');
                 
                 $current_year = date('y');
                 $random_number = str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
                 $student_number = $current_year . '-' . $random_number;
                 
-                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                $studentStmt = $pdo->prepare('INSERT INTO students (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, sex, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
                 $studentStmt->execute([
                     $id, 
                     $student_number, 
@@ -301,21 +405,75 @@
                     $suffix ?: null,
                     $birthdate,
                     $address,
-                    $course_id > 0 ? $course_id : null
+                    $course_id,
+                    $sex
                 ]);
                 error_log("Created student record for user_id: $id, student_number: $student_number, name: $s_first $s_last, course_id: $course_id");
             }
             // Handle role change from teacher to non-teacher
             elseif (!$is_teacher_now && $was_teacher) {
-                // Role changed from teacher - clean up staff record
-                $pdo->prepare('DELETE FROM staff WHERE user_id = ?')->execute([$id]);
-                error_log("Removed staff record for user_id: $id");
+                // Role changed from teacher - no need to clean up as we're not using a separate staff table
+                error_log("User with id $id is no longer a teacher");
             }
             // Handle role change from student to non-student
             elseif (!$is_student_now && $was_student) {
                 // Role changed from student - clean up student record
                 $pdo->prepare('DELETE FROM students WHERE user_id = ?')->execute([$id]);
                 error_log("Removed student record for user_id: $id");
+            }
+            // Handle role change to marshal
+            elseif ($is_marshal_now && !$was_marshal) {
+                // Role changed to marshal - create marshal record
+                $staff_number = trim($_POST['staff_number'] ?? '');
+                $department = trim($_POST['department'] ?? '');
+                $position = trim($_POST['position'] ?? '');
+                
+                if (empty($staff_number) || empty($department) || empty($position)) {
+                    throw new Exception('Staff number, department, and position are required for marshal accounts.');
+                }
+                
+                // Look up department_id from department_name
+                $deptStmt = $pdo->prepare('SELECT id FROM departments WHERE department_name = ?');
+                $deptStmt->execute([$department]);
+                $deptResult = $deptStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$deptResult) {
+                    throw new Exception('Department not found. Please select a valid department.');
+                }
+                
+                $department_id = (int)$deptResult['id'];
+                
+                // Check if department already has a marshal (unique constraint)
+                $existingMarshalStmt = $pdo->prepare('SELECT id FROM marshal WHERE department_id = ?');
+                $existingMarshalStmt->execute([$department_id]);
+                if ($existingMarshalStmt->fetch()) {
+                    throw new Exception('This department already has a marshal assigned. Please select a different department.');
+                }
+                
+                // Insert into marshal table
+                $marshalStmt = $pdo->prepare('INSERT INTO marshal (
+                    user_id, staff_number, first_name, middle_name, last_name, 
+                    suffix, position, department_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                
+                $marshalStmt->execute([
+                    $id,
+                    $staff_number,
+                    $first_name ?: 'Marshal',
+                    $middle_name ?: null,
+                    $last_name ?: 'Name',
+                    $suffix ?: null,
+                    $position,
+                    $department_id
+                ]);
+                
+                error_log("Created marshal record for user_id: $id, staff_number: $staff_number, department_id: $department_id");
+            }
+            // Handle role change from marshal to non-marshal
+            elseif (!$is_marshal_now && $was_marshal) {
+                // Role changed from marshal - clean up marshal record
+                $pdo->prepare('DELETE FROM marshal WHERE user_id = ?')->execute([$id]);
+                error_log("Removed marshal record for user_id: $id");
             }
             
             // Update user with new data (username is not updated from the modal)
@@ -327,6 +485,7 @@
                 $birthdate = !empty($_POST['birthdate']) ? date('Y-m-d', strtotime($_POST['birthdate'])) : null;
                 $address = trim($_POST['address'] ?? '');
                 $course_id = (int)($_POST['course_id'] ?? 0);
+                $sex = trim($_POST['sex'] ?? '');
                 
                 // Check if student record exists
                 $studentCheck = $pdo->prepare('SELECT id FROM students WHERE user_id = ?');
@@ -342,6 +501,7 @@
                         birthdate = ?, 
                         address = ?,
                         course_id = ?,
+                        sex = ?,
                         updated_at = CURRENT_TIMESTAMP() 
                         WHERE user_id = ?');
                     $studentStmt->execute([
@@ -352,6 +512,7 @@
                         $birthdate,
                         $address,
                         $course_id > 0 ? $course_id : null,
+                        $sex,
                         $id
                     ]);
                     error_log("Updated student record for user_id: $id, course_id: $course_id");
@@ -362,8 +523,8 @@
                     $student_number = $current_year . '-' . $random_number;
                     
                     $studentStmt = $pdo->prepare('INSERT INTO students 
-                        (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                        (user_id, student_number, first_name, middle_name, last_name, suffix, birthdate, address, course_id, sex, created_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
                     $studentStmt->execute([
                         $id, 
                         $student_number, 
@@ -373,17 +534,112 @@
                         $suffix ?: null,
                         $birthdate,
                         $address,
-                        $course_id > 0 ? $course_id : null
+                        $course_id > 0 ? $course_id : null,
+                        $sex
                     ]);
                     error_log("Created new student record for user_id: $id, course_id: $course_id");
                 }
             }
             
+            // If the user is a marshal, update their marshal record
+            if ($is_marshal_now) {
+                $staff_number = trim($_POST['staff_number'] ?? '');
+                $department = trim($_POST['department'] ?? '');
+                $position = trim($_POST['position'] ?? '');
+                
+                // Look up department_id from department_name
+                $department_id = null;
+                if (!empty($department)) {
+                    $deptStmt = $pdo->prepare('SELECT id FROM departments WHERE department_name = ?');
+                    $deptStmt->execute([$department]);
+                    $deptResult = $deptStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($deptResult) {
+                        $department_id = (int)$deptResult['id'];
+                    }
+                }
+                
+                // Check if marshal record exists
+                $marshalCheck = $pdo->prepare('SELECT id, department_id FROM marshal WHERE user_id = ?');
+                $marshalCheck->execute([$id]);
+                $existingMarshal = $marshalCheck->fetch(PDO::FETCH_ASSOC);
+                
+                if ($existingMarshal) {
+                    // Update existing marshal record
+                    // If department changed, check if new department already has a marshal
+                    $old_dept_id = (int)$existingMarshal['department_id'];
+                    if ($department_id && $department_id !== $old_dept_id) {
+                        $existingMarshalStmt = $pdo->prepare('SELECT id FROM marshal WHERE department_id = ? AND user_id != ?');
+                        $existingMarshalStmt->execute([$department_id, $id]);
+                        if ($existingMarshalStmt->fetch()) {
+                            throw new Exception('This department already has a marshal assigned. Please select a different department.');
+                        }
+                    }
+                    
+                    $marshalStmt = $pdo->prepare('UPDATE marshal SET 
+                        staff_number = ?, 
+                        first_name = ?, 
+                        middle_name = ?, 
+                        last_name = ?, 
+                        suffix = ?, 
+                        position = ?,
+                        department_id = ?,
+                        updated_at = CURRENT_TIMESTAMP() 
+                        WHERE user_id = ?');
+                    $marshalStmt->execute([
+                        $staff_number,
+                        $first_name,
+                        $middle_name ?: null,
+                        $last_name,
+                        $suffix ?: null,
+                        $position,
+                        $department_id,
+                        $id
+                    ]);
+                    error_log("Updated marshal record for user_id: $id, department_id: $department_id");
+                } else {
+                    // Create new marshal record if it doesn't exist
+                    if (empty($staff_number) || empty($department) || empty($position)) {
+                        throw new Exception('Staff number, department, and position are required for marshal accounts.');
+                    }
+                    
+                    if (!$department_id) {
+                        throw new Exception('Department not found. Please select a valid department.');
+                    }
+                    
+                    // Check if department already has a marshal
+                    $existingMarshalStmt = $pdo->prepare('SELECT id FROM marshal WHERE department_id = ?');
+                    $existingMarshalStmt->execute([$department_id]);
+                    if ($existingMarshalStmt->fetch()) {
+                        throw new Exception('This department already has a marshal assigned. Please select a different department.');
+                    }
+                    
+                    $marshalStmt = $pdo->prepare('INSERT INTO marshal 
+                        (user_id, staff_number, first_name, middle_name, last_name, suffix, position, department_id, created_at) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())');
+                    $marshalStmt->execute([
+                        $id,
+                        $staff_number,
+                        $first_name ?: 'Marshal',
+                        $middle_name ?: null,
+                        $last_name ?: 'Name',
+                        $suffix ?: null,
+                        $position,
+                        $department_id
+                    ]);
+                    error_log("Created new marshal record for user_id: $id, department_id: $department_id");
+                }
+            }
+            
             $pdo->commit();
-            $_SESSION['flash'] = flash('success', 'User updated successfully.');
+            echo json_encode(['success' => true, 'message' => 'User updated successfully']);
+            exit;
         } catch (Exception $e) {
-            $pdo->rollBack();
-            throw $e;
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
         }
         
         header('Location: ' . basename($_SERVER['PHP_SELF']));
@@ -481,28 +737,32 @@
       u.is_active,
       u.last_login,
       r.name AS role_name,
-      -- Name source: prefer student, then staff (so edit form can populate name fields)
-      COALESCE(s.first_name, st.first_name, '') AS first_name,
-      COALESCE(s.middle_name, st.middle_name, '') AS middle_name,
-      COALESCE(s.last_name, st.last_name, '') AS last_name,
-      COALESCE(s.suffix, st.suffix, '') AS suffix,
+      -- Get name from students table if available, then marshal table, otherwise from username
+      COALESCE(s.first_name, m.first_name, '') AS first_name,
+      COALESCE(s.middle_name, m.middle_name, '') AS middle_name,
+      COALESCE(s.last_name, m.last_name, u.username) AS last_name,
+      COALESCE(s.suffix, m.suffix, '') AS suffix,
       -- student fields (if any)
       s.student_number AS student_number,
       s.course_id AS course_id,
       s.birthdate AS birthdate,
       s.address AS address,
-      -- staff/teacher fields (if any)
-      st.staff_number AS staff_number,
-      st.department AS department,
-      st.position AS position,
-      -- parent relation (if any) - may be null or one row
-      p.student_id AS student_id,
-      p.relationship AS relationship
+      s.sex AS sex,
+      -- staff/teacher/marshal fields (if any)
+      COALESCE(m.staff_number, '') AS staff_number,
+      COALESCE(d.department_name, '') AS department,
+      COALESCE(m.position, '') AS position,
+      -- Marshal fields
+      m.department_id AS marshal_department_id,
+      -- Parent relation removed as parent_student table doesn't exist
+      NULL AS student_id,
+      NULL AS relationship
     FROM users u
     JOIN roles r ON r.id = u.role_id
     LEFT JOIN students s ON s.user_id = u.id
-    LEFT JOIN staff st ON st.user_id = u.id
-    LEFT JOIN parent_student p ON p.parent_user_id = u.id
+    LEFT JOIN marshal m ON m.user_id = u.id
+    LEFT JOIN departments d ON d.id = m.department_id
+    -- Removed parent_student join as it doesn't exist
     $whereSql
     ORDER BY u.created_at DESC
   ");
@@ -626,16 +886,16 @@
       <div class="modal-body max-h-[60vh] overflow-y-auto pr-2 space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <!-- Basic Information for All Users -->
-          <!-- username removed from form -->
+          <!-- username removed from form; do not require or update it here -->
           
           <div>
             <label class="block text-sm font-medium mb-1">First Name <span class="text-red-500">*</span></label>
-            <input type="text" name="first_name" id="first_name" class="w-full border rounded px-3 py-2" />
+            <input type="text" name="first_name" id="first_name" class="w-full border rounded px-3 py-2" required />
           </div>
           
           <div>
             <label class="block text-sm font-medium mb-1">Last Name <span class="text-red-500">*</span></label>
-            <input type="text" name="last_name" id="last_name" class="w-full border rounded px-3 py-2" />
+            <input type="text" name="last_name" id="last_name" class="w-full border rounded px-3 py-2" required />
           </div>
           
           <div>
@@ -706,7 +966,18 @@
               </div>
               <div>
                 <label for="birthdate" class="block text-sm font-medium mb-1">Birthdate <span class="text-red-500">*</span></label>
-                <input type="date" name="birthdate" id="birthdate" class="w-full border rounded px-3 py-2" />
+                <input type="date" name="birthdate" id="birthdate" class="w-full border rounded px-3 py-2" onchange="calculateAge()" />
+                <input type="hidden" name="age" id="age" />
+                <p id="ageDisplay" class="text-sm text-gray-500 mt-1">Age: -</p>
+              </div>
+              <div>
+                <label for="sex" class="block text-sm font-medium mb-1">Sex <span class="text-red-500">*</span></label>
+                <select name="sex" id="sex" class="w-full border rounded px-3 py-2" required>
+                  <option value="">Select Sex</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
               <div class="sm:col-span-2">
                 <label for="address" class="block text-sm font-medium mb-1">Address <span class="text-red-500">*</span></label>
@@ -728,28 +999,6 @@
           </div>
         </div>
         
-        <!-- Parent Specific Fields -->
-        <div id="parentFields" class="hidden border-t pt-4 mt-4 space-y-4">
-          <h4 class="font-medium text-gray-900">Parent Information</h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="sm:col-span-2">
-              <label for="student_id" class="block text-sm font-medium mb-1">Student ID <span class="text-red-500">*</span></label>
-              <input type="text" name="student_id" id="student_id" class="w-full border rounded px-3 py-2" placeholder="Enter student ID" />
-            </div>
-            <div class="sm:col-span-2">
-              <label for="relationship" class="block text-sm font-medium mb-1">Relationship <span class="text-red-500">*</span></label>
-              <select name="relationship" id="relationship" class="w-full border rounded px-3 py-2">
-                <option value="">Select Relationship</option>
-                <option value="Mother">Mother</option>
-                <option value="Father">Father</option>
-                <option value="Guardian">Guardian</option>
-                <option value="Sibling">Sibling</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-          </div>
-        </div>
-        
         <!-- Staff/Teacher Common Fields -->
         <div id="staffTeacherFields" class="hidden border-t pt-4 mt-4 space-y-4">
           <h4 class="font-medium text-gray-900">Employment Information</h4>
@@ -760,7 +1009,42 @@
             </div>
             <div>
               <label class="block text-sm font-medium mb-1">Department <span class="text-red-500">*</span></label>
-              <input type="text" name="department" id="department" class="w-full border rounded px-3 py-2" placeholder="e.g., IT, Math, Science" />
+              <select name="department" id="department" class="w-full border rounded px-3 py-2" required>
+                <option value="">Select Department</option>
+                <?php
+                // Fetch departments that don't have a marshal assigned yet
+                try {
+                  $deptQuery = "SELECT d.department_name
+                                FROM departments d
+                                LEFT JOIN marshal m ON d.id = m.department_id
+                                WHERE m.id IS NULL
+                                ORDER BY d.department_name ASC";
+                  $deptStmt = $pdo->query($deptQuery);
+                  $departments = $deptStmt->fetchAll(PDO::FETCH_COLUMN);
+                  
+                  // If no departments found, use default list
+                  if (empty($departments)) {
+                    $departments = [
+                      'No department found'
+                    ];
+                  }
+                  
+                  // Output department options
+                  foreach ($departments as $dept) {
+                    echo "<option value=\"" . htmlspecialchars($dept, ENT_QUOTES, 'UTF-8') . "\">" . htmlspecialchars($dept, ENT_QUOTES, 'UTF-8') . "</option>";
+                  }
+                } catch (Exception $e) {
+                  // Fallback to default departments if query fails
+                  error_log("Error fetching departments: " . $e->getMessage());
+                  $defaultDepartments = [
+                    'No department found.'
+                  ];
+                  foreach ($defaultDepartments as $dept) {
+                    echo "<option value=\"" . htmlspecialchars($dept, ENT_QUOTES, 'UTF-8') . "\">" . htmlspecialchars($dept, ENT_QUOTES, 'UTF-8') . "</option>";
+                  }
+                }
+                ?>
+              </select>
             </div>
             <div class="sm:col-span-2">
               <label class="block text-sm font-medium mb-1">Position <span class="text-red-500">*</span></label>
@@ -884,7 +1168,98 @@
 </div>
 
 <script>
-  // Initialize modal elements
+  // Initialize form submission
+  document.addEventListener('DOMContentLoaded', function() {
+    const userForm = document.getElementById('userForm');
+    if (userForm) {
+      userForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // Show loading state
+        const submitBtn = userForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        
+        try {
+          // Get form data
+          const formData = new FormData(userForm);
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+          });
+          
+          const result = await response.text();
+          
+          // Check if response is HTML (error page) or JSON
+          let isJson = false;
+          let data = {};
+          try {
+            data = JSON.parse(result);
+            isJson = true;
+          } catch (e) {
+            // Not JSON, treat as HTML response
+            window.location.reload();
+            return;
+          }
+          
+          if (response.ok) {
+            // Show success message
+            await Swal.fire({
+              icon: 'success',
+              title: 'Success!',
+              text: data.message || 'Operation completed successfully',
+              confirmButtonColor: '#3b82f6',
+            });
+            
+            // Reload the page to show updated data
+            window.location.reload();
+          } else {
+            throw new Error(data.message || 'An error occurred');
+          }
+        } catch (error) {
+          // Show error message
+          await Swal.fire({
+            icon: 'error',
+            title: 'Error!',
+            text: error.message || 'An error occurred while processing your request',
+            confirmButtonColor: '#ef4444',
+          });
+        } finally {
+          // Reset button state
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnText;
+        }
+      });
+    }
+  });
+
+  // Calculate age from birthdate
+  function calculateAge() {
+    const birthdate = document.getElementById('birthdate');
+    const ageDisplay = document.getElementById('ageDisplay');
+    
+    if (!birthdate || !ageDisplay) return;
+    
+    const birthDate = new Date(birthdate.value);
+    if (isNaN(birthDate.getTime())) {
+      ageDisplay.textContent = 'Age: -';
+      return;
+    }
+    
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    document.getElementById('age').value = age;
+    ageDisplay.textContent = `Age: ${age} years`;
+  }
+
+  // Initialize all required elements
   const userModal = document.getElementById('userModal');
   const rolesModal = document.getElementById('rolesModal');
   const resetModal = document.getElementById('resetModal');
@@ -904,44 +1279,98 @@
   }
 
   function openCreateUser() {
-    if (!userModal || !userForm || !userModalTitle) return;
+    // Check for required elements
+    if (!userModal || !userForm || !userModalTitle || !passwordRow) {
+      console.error('Required elements not found');
+      return;
+    }
     
-    userModalTitle.textContent = 'Create User';
-    userForm.action.value = 'create_user';
-    userForm.reset();
-    userForm.id.value = '';
-    // username removed - don't touch userForm.username
-    userForm.first_name.value = '';
-    userForm.middle_name.value = '';
-    userForm.last_name.value = '';
-    userForm.suffix.value = '';
-    userForm.email.value = '';
-    userForm.contact_number.value = '';
-    userForm.role_id.value = '';
-    userForm.is_active.checked = true;
-    userForm.password.required = true;
-    passwordRow.classList.remove('hidden');
-    
-    // Reset all role-specific fields
-    [
-      'student_number', 'birthdate', 'address', 'course_id',  // Student
-      'student_id', 'relationship',              // Parent
-      'staff_number', 'department', 'position'   // Staff/Teacher
-    ].forEach(field => {
-      const el = document.getElementById(field);
-      if (el) el.value = '';
-    });
+    try {
+      // Set modal title
+      userModalTitle.textContent = 'Create User';
+      
+      // Reset the form
+      userForm.reset();
+      
+      // Set form action
+      const actionInput = userForm.querySelector('input[name="action"]');
+      if (actionInput) {
+        actionInput.value = 'create_user';
+      }
+      
+      // Set default values for form fields
+      const fieldsToReset = {
+        'first_name': '',
+        'middle_name': '',
+        'last_name': '',
+        'suffix': '',
+        'email': '',
+        'contact_number': '',
+        'role_id': '',
+        'is_active': true,
+        'password': '',
+        'student_number': '',
+        'birthdate': '',
+        'address': '',
+        'course_id': '',
+        'sex': '',
+        'staff_number': '',
+        'department': '',
+        'position': ''
+      };
+      
+      // Safely set field values
+      Object.entries(fieldsToReset).forEach(([field, value]) => {
+        const element = userForm.elements[field] || document.getElementById(field);
+        if (element) {
+          if (element.type === 'checkbox') {
+            element.checked = value;
+          } else {
+            element.value = value;
+          }
+        }
+      });
+      
+      // Set password as required and show the password field
+      if (userForm.password) {
+        userForm.password.required = true;
+      }
+      passwordRow.classList.remove('hidden');
+      
+      // Show the modal (ensure flex centering)
+      show(userModal);
+      
+      // Initialize role fields
+    if (typeof toggleRoleFields === 'function') {
+      try {
+        toggleRoleFields();
+      } catch (error) {
+        console.error('Error initializing role fields:', error);
+      }
+    }
     
     // Hide all role-specific sections and reset required fields
-    ['studentFieldsContainer', 'parentFields', 'staffTeacherFields'].forEach(id => {
-      const section = document.getElementById(id);
-      if (section) {
-        section.classList.add('hidden');
-        section.querySelectorAll('input, select, textarea').forEach(field => {
-          field.required = false;
+    (function() {
+      try {
+        const roleSections = ['studentFieldsContainer', 'staffTeacherFields'];
+        roleSections.forEach(id => {
+          const section = document.getElementById(id);
+          if (section) {
+            section.classList.add('hidden');
+            try {
+              const formFields = section.querySelectorAll('input, select, textarea');
+              formFields.forEach(field => {
+                field.required = false;
+              });
+            } catch (e) {
+              console.error('Error updating form fields:', e);
+            }
+          }
         });
+      } catch (error) {
+        console.error('Error in role-specific section handling:', error);
       }
-    });
+    })();
     
     // Set required for basic fields
     ['first_name', 'last_name', 'email'].forEach(fieldId => {
@@ -960,59 +1389,122 @@
     
     // Initialize role fields based on default selection
     toggleRoleFields();
+    } catch (error) {
+      console.error('Error in openCreateUser:', error);
+    }
   }
 
   function openEditUser(u) {
-    userModalTitle.textContent = 'Edit User';
-    userForm.action.value = 'update_user';
-    userForm.id.value = u.id;
-    // username removed - do not set or require username
-    userForm.first_name.value = u.first_name || '';
-    userForm.middle_name.value = u.middle_name || '';
-    userForm.last_name.value = u.last_name || '';
-    userForm.suffix.value = u.suffix || '';
-    userForm.email.value = u.email || '';
-    userForm.contact_number.value = u.contact_number || '';
-    userForm.role_id.value = u.role_id || '';
-    userForm.is_active.checked = parseInt(u.is_active) === 1;
-    userForm.password.value = '';
-    userForm.password.required = false;
-    passwordRow.classList.add('hidden');
+    if (!userModal || !userForm || !userModalTitle || !passwordRow) {
+      console.error('Required elements not found');
+      return;
+    }
     
-    // Set role-specific fields if they exist in the user object
-    const roleFields = {
-      // Student fields
-      student_number: u.student_number,
-      birthdate: u.birthdate,
-      address: u.address,
-      course_id: u.course_id,
-      // Parent fields
-      student_id: u.student_id,
-      relationship: u.relationship,
-      // Staff/Teacher fields
-      staff_number: u.staff_number,
-      department: u.department,
-      position: u.position
-    };
-    
-    Object.entries(roleFields).forEach(([fieldId, value]) => {
-      const field = document.getElementById(fieldId);
-      if (field) {
-        field.value = value !== undefined && value !== null ? value : '';
+    try {
+      userModalTitle.textContent = 'Edit User';
+      
+      // Set form action and ID
+      const actionInput = userForm.querySelector('input[name="action"]');
+      const idInput = userForm.querySelector('input[name="id"]');
+      if (actionInput) {
+        actionInput.value = 'update_user';
       }
-    });
+      if (idInput) {
+        idInput.value = u.id;
+      }
+      
+      // Parse username if first_name/last_name are not available
+      let firstName = u.first_name || '';
+      let lastName = u.last_name || '';
+      
+      // If names are not available, try to parse from username
+      if (!firstName && !lastName && u.username) {
+        const nameParts = u.username.trim().split(/\s+/);
+        if (nameParts.length >= 2) {
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(' ');
+        } else if (nameParts.length === 1) {
+          lastName = nameParts[0];
+        }
+      }
+      
+      // Set user data
+      const userData = {
+        'first_name': firstName,
+        'middle_name': u.middle_name || '',
+        'last_name': lastName,
+        'suffix': u.suffix || '',
+        'email': u.email || '',
+        'contact_number': u.contact_number || '',
+        'role_id': u.role_id || '',
+        'is_active': parseInt(u.is_active) === 1,
+        'password': '',
+        'student_number': u.student_number || '',
+        'birthdate': u.birthdate || '',
+        'address': u.address || '',
+        'course_id': u.course_id || '',
+        'sex': u.sex || '',
+        'staff_number': u.staff_number || '',
+        'department': u.department || '',
+        'position': u.position || ''
+      };
+      
+      // Safely set field values
+      Object.entries(userData).forEach(([field, value]) => {
+        const element = userForm.elements[field] || document.getElementById(field);
+        if (element) {
+          if (element.type === 'checkbox') {
+            element.checked = value;
+          } else {
+            element.value = value;
+          }
+        }
+      });
+      
+      // Handle password field
+      if (userForm.password) {
+        userForm.password.required = false;
+        userForm.password.value = '';
+      }
+      passwordRow.classList.add('hidden');
+      
+      // Show the modal
+      userModal.classList.remove('hidden');
+      
+      // Initialize role fields
+      if (typeof toggleRoleFields === 'function') {
+        toggleRoleFields();
+      }
     
-    // Toggle role fields to show/hide appropriate sections and set required attributes
-    toggleRoleFields();
-    
-    show(userModal);
+      // Set role-specific fields if they exist in the user object
+      const roleFields = {
+        // Student fields
+        student_number: u.student_number,
+        birthdate: u.birthdate,
+        address: u.address,
+        course_id: u.course_id,
+        sex: u.sex,
+        // Staff/Teacher fields
+        staff_number: u.staff_number,
+        department: u.department,
+        position: u.position
+      };
+      
+      Object.entries(roleFields).forEach(([fieldId, value]) => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+          field.value = value !== undefined && value !== null ? value : '';
+        }
+      });
+    } catch (error) {
+      console.error('Error in openEditUser:', error);
+    }
   }
 
   // Role ID mappings
   const roleIds = {
     admin: <?php echo $roleMap['admin'] ?? 1; ?>,
     student: <?php echo $roleMap['student'] ?? 3; ?>,
-    parent: <?php echo $roleMap['parent'] ?? 4; ?>,
     staff: <?php echo $roleMap['staff'] ?? 2; ?>,
     teacher: <?php echo $roleMap['teacher'] ?? ($roleMap['staff'] ?? 2); ?>
   };
@@ -1042,9 +1534,9 @@
   // Role IDs mapping for better maintainability
   const ROLE_IDS = {
     ADMIN: 1,
-    STAFF: 5,
+    STAFF: 2,
     STUDENT: 3,
-    PARENT: 4,
+    MARSHAL: 5,
     TEACHER: 6
   };
 
@@ -1058,7 +1550,6 @@
     // Get all role-specific containers
     const roleContainers = {
       student: document.getElementById('studentFieldsContainer'),
-      parent: document.getElementById('parentFields'),
       staff: document.getElementById('staffTeacherFields'),
       teacher: document.getElementById('staffTeacherFields')
     };           
@@ -1072,8 +1563,7 @@
     // Reset all role-specific required fields
     const allRoleFields = [
       'student_number', 'birthdate', 'address', 'course_id', // Student
-      'student_id', 'relationship',            // Parent
-      'department', 'position'                 // Staff/Teacher
+      'department', 'position'                              // Staff/Teacher
     ];
     
     allRoleFields.forEach(fieldId => {
@@ -1101,19 +1591,9 @@
         }
         break;
         
-      case ROLE_IDS.PARENT:
-        if (roleContainers.parent) {
-          roleContainers.parent.classList.remove('hidden');
-          const parentFields = ['student_id', 'relationship', 'first_name', 'last_name'];
-          parentFields.forEach(fieldId => {
-            const field = document.getElementById(fieldId);
-            if (field) field.required = true;
-          });
-        }
-        break;
-        
       case ROLE_IDS.STAFF:
       case ROLE_IDS.TEACHER:
+      case ROLE_IDS.MARSHAL:
         if (roleContainers.staff) roleContainers.staff.classList.remove('hidden');
         if (roleId === ROLE_IDS.TEACHER && roleContainers.teacher) {
           roleContainers.teacher.classList.remove('hidden');
@@ -1169,7 +1649,12 @@
     });
     
     // Initialize role fields after a small delay to ensure DOM is updated
-    setTimeout(toggleRoleFields, 50);
+    setTimeout(() => {
+      toggleRoleFields();
+      // Ensure modal is centered and visible after all updates
+      show(userModal);
+      if (userModal) { userModal.scrollTop = 0; }
+    }, 50);
   };
 
   function closeUserModal() { hide(userModal); }
@@ -1191,7 +1676,7 @@
   }
   function closeReset() { hide(resetModal); }
 
-  function show(el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+  function show(el) { el.classList.remove('hidden'); el.classList.add('flex'); el.classList.add('items-center'); el.classList.add('justify-center'); }
   function hide(el) { el.classList.add('hidden'); el.classList.remove('flex'); }
 
   function genPwd(selector) {

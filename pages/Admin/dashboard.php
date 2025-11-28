@@ -14,7 +14,7 @@
   $roleCount = fetchScalar($pdo, "SELECT COUNT(*) FROM roles");
   $violationCategories = fetchScalar($pdo, "SELECT COUNT(*) FROM violation_categories");
   $violationTypes = fetchScalar($pdo, "SELECT COUNT(*) FROM violation_types");
-  $teacherCount = fetchScalar($pdo, "SELECT COUNT(*) FROM staff");
+  $teacherCount = fetchScalar($pdo, "SELECT COUNT(*) FROM users WHERE role_id = 5");
   $totalCases = fetchScalar($pdo, "SELECT COUNT(*) FROM cases");
   $resolvedCases = fetchScalar($pdo, "SELECT COUNT(*) FROM cases WHERE status_id = 4");
   $openCases = $totalCases - $resolvedCases;

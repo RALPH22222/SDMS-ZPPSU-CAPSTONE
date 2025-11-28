@@ -5,7 +5,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../database/database.php';
 
 try {    
-    $stmt = $pdo->query("SELECT staff_number FROM staff ORDER BY id DESC LIMIT 1");
+    $stmt = $pdo->query("SELECT staff_number FROM marshal ORDER BY id DESC LIMIT 1");
     $lastStaff = $stmt->fetch(PDO::FETCH_ASSOC);
     
     $currentYear = date('Y');

@@ -99,10 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             Log In
                         </button>
                     </form>
-
-                    <p class="mt-6 text-center text-sm">
-                        Don't have an account? <a href="/SDMS/pages/Auth/signup.php" class="text-primary font-semibold">Create account</a>
-                    </p>
                 </div>
             </div>
         </div>

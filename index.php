@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://unpkg.com/aos@2.3.4/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <body class="bg-white text-dark">
 <header class="bg-white shadow-md fixed w-full top-0 z-50 border-b-2 border-primary">
     <div class="w-full max-w-full px-4 py-2 sm:py-4">
@@ -203,7 +204,9 @@
             </div>
         </div>
         <?php
-        $db = new PDO('mysql:host=localhost;dbname=zppsu_disciplinary', 'root', '');
+        require_once __DIR__ . '/config.php';
+        require_once __DIR__ . '/database/database.php';
+        $db = $pdo;
         $categories = $db->query("SELECT * FROM violation_categories ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
         $allViolationsData = [];
         foreach ($categories as $category) {

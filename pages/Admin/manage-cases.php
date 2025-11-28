@@ -72,6 +72,7 @@
   $q = trim($_GET['q'] ?? '');
   $status_id = isset($_GET['status_id']) && $_GET['status_id'] !== '' ? (int)$_GET['status_id'] : null;
   $violation_type_id = isset($_GET['violation_type_id']) && $_GET['violation_type_id'] !== '' ? (int)$_GET['violation_type_id'] : null;
+  $department_id = isset($_GET['department_id']) && $_GET['department_id'] !== '' ? (int)$_GET['department_id'] : null;
   $date_from = trim($_GET['date_from'] ?? '');
   $date_to = trim($_GET['date_to'] ?? '');
   $conf = isset($_GET['conf']) ? (int)$_GET['conf'] : -1; // -1=All, 0=No, 1=Yes
@@ -85,6 +86,10 @@
   $statuses = $pdo->query('SELECT id, name FROM case_status ORDER BY id ASC')->fetchAll(PDO::FETCH_ASSOC);
   $violationTypes = $pdo->query('SELECT id, CONCAT(code, " — ", name) AS label FROM violation_types ORDER BY code ASC')->fetchAll(PDO::FETCH_ASSOC);
 
+  // Get departments for filter dropdown
+  $deptStmt = $pdo->query('SELECT id, department_name, abbreviation FROM departments ORDER BY department_name');
+  $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
+
   // Build query
   $where = [];
   $params = [];
@@ -95,6 +100,7 @@
   }
   if ($status_id !== null) { $where[] = 'c.status_id = ?'; $params[] = $status_id; }
   if ($violation_type_id !== null) { $where[] = 'c.violation_type_id = ?'; $params[] = $violation_type_id; }
+  if ($department_id !== null) { $where[] = 'd.id = ?'; $params[] = $department_id; }
   if ($date_from !== '') { $where[] = 'DATE(c.incident_date) >= ?'; $params[] = $date_from; }
   if ($date_to !== '') { $where[] = 'DATE(c.incident_date) <= ?'; $params[] = $date_to; }
   if ($conf === 0) { $where[] = 'c.is_confidential = 0'; }
@@ -106,9 +112,11 @@
   $countSql = "SELECT COUNT(*)
                FROM cases c
                JOIN students s ON s.id = c.student_id
+               JOIN courses co ON co.id = s.course_id
+               JOIN departments d ON d.id = co.department_id
                JOIN violation_types vt ON vt.id = c.violation_type_id
                JOIN case_status st ON st.id = c.status_id
-               LEFT JOIN staff rf ON rf.id = c.reported_by_staff_id
+               LEFT JOIN users rf ON rf.id = c.reported_by_marshal_id
                $whereSql";
   $stmt = $pdo->prepare($countSql);
   $stmt->execute($params);
@@ -118,19 +126,23 @@
 
   // Fetch page
   $sql = "SELECT
-            c.id, c.case_number, c.title, c.description, c.location, c.incident_date,
-            c.status_id, c.resolution, c.resolution_date, c.is_confidential,
-            s.first_name AS s_fn, s.last_name AS s_ln, s.student_number,
-            vt.code AS v_code, vt.name AS v_name,
+            c.id, c.case_number, c.title, c.incident_date, c.is_confidential, c.status_id,
+            CONCAT(s.last_name, ', ', s.first_name, IFNULL(CONCAT(' ', s.middle_name), ''), IF(s.suffix IS NOT NULL, CONCAT(' ', s.suffix), '')) AS student_name,
+            s.student_number,
+            vt.name AS violation_type,
             st.name AS status_name,
-            rf.first_name AS r_fn, rf.last_name AS r_ln
+            rf.username AS r_username,
+            d.department_name,
+            d.abbreviation AS dept_abbr
           FROM cases c
           JOIN students s ON s.id = c.student_id
+          JOIN courses co ON co.id = s.course_id
+          JOIN departments d ON d.id = co.department_id
           JOIN violation_types vt ON vt.id = c.violation_type_id
           JOIN case_status st ON st.id = c.status_id
-          LEFT JOIN staff rf ON rf.id = c.reported_by_staff_id
+          LEFT JOIN users rf ON rf.id = c.reported_by_marshal_id
           $whereSql
-          ORDER BY c.created_at DESC
+          ORDER BY c.incident_date DESC
           LIMIT $pageSize OFFSET $offset";
   $stmt = $pdo->prepare($sql);
   $stmt->execute($params);
@@ -238,6 +250,17 @@
             <input type="text" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Case #, title, student" class="w-full border rounded px-3 py-2" />
           </div>
           <div>
+            <label class="block text-sm font-medium mb-1">Department</label>
+            <select name="department_id" class="w-full border rounded px-3 py-2">
+              <option value="">All Departments</option>
+              <?php foreach ($departments as $dept): ?>
+              <option value="<?php echo $dept['id']; ?>" <?php echo (isset($department_id) && $department_id == $dept['id']) ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($dept['department_name']); ?>
+              </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div>
             <label class="block text-sm font-medium mb-1">Status</label>
             <select name="status_id" class="w-full border rounded px-3 py-2">
               <option value="">All</option>
@@ -286,6 +309,7 @@
             <tr>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Case</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Violation</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Incident Date</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -308,16 +332,21 @@
                   <div class="text-xs text-gray-600"><?php echo htmlspecialchars($c['title']); ?></div>
                 </td>
                 <td class="px-4 py-3 text-sm">
-                  <div class="text-dark font-medium"><?php echo htmlspecialchars($c['s_ln'] . ', ' . $c['s_fn']); ?></div>
+                  <div class="text-dark font-medium"><?php echo htmlspecialchars($c['student_name']); ?></div>
                   <div class="text-xs text-gray-600">ID: <?php echo htmlspecialchars($c['student_number']); ?></div>
                 </td>
                 <td class="px-4 py-3 text-sm">
-                  <div class="text-dark font-medium"><?php echo htmlspecialchars($c['v_name']); ?></div>
-                  <div class="text-xs text-gray-600"><?php echo htmlspecialchars($c['v_code']); ?></div>
+                  <span class="text-sm text-gray-700"><?php echo htmlspecialchars($c['dept_abbr'] ?? 'N/A'); ?></span>
+                  <div class="text-xs text-gray-500"><?php echo htmlspecialchars($c['department_name'] ?? ''); ?></div>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <?php echo htmlspecialchars($c['violation_type']); ?>
+                  </span>
                 </td>
                 <td class="px-4 py-3 text-sm">
                   <?php echo htmlspecialchars(date('Y-m-d H:i', strtotime($c['incident_date']))); ?><br>
-                  <span class="text-xs text-gray-600">Reported by: <?php echo htmlspecialchars(trim(($c['r_ln'] ?? '') . ', ' . ($c['r_fn'] ?? '')) ?: '—'); ?></span>
+                  <span class="text-xs text-gray-600">Reported by: <?php echo htmlspecialchars($c['r_username'] ?? '—'); ?></span>
                 </td>
                 <td class="px-4 py-3 text-sm">
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs <?php echo $isResolved ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'; ?>">

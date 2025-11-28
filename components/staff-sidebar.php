@@ -21,7 +21,7 @@
   <div class="h-16 flex items-center px-4 border-b border-gray-200 bg-white">
     <a href="dashboard.php" class="flex items-center gap-3">
       <img src="../../src/images/Logo.png" alt="ZPPSU" class="h-8 w-8">
-      <span class="text-primary font-bold">Staff Panel</span>
+      <span class="text-primary font-bold">Marshal Panel</span>
     </a>
     <button id="staffSidebarToggle" class="ml-auto md:hidden text-primary text-xl focus:outline-none" aria-label="Toggle Sidebar">
       <i class="fa-solid fa-bars"></i>

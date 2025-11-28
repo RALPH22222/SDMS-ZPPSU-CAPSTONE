@@ -1,5 +1,9 @@
+
 <?php
-  if (!isset($pageTitle)) { $pageTitle = 'Staff - SDMS'; }
+// Set default page title if not already set
+if (!isset($pageTitle)) {
+    $pageTitle = 'Staff - SDMS';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

@@ -23,13 +23,32 @@
    function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
  
    $q = trim($_GET['q'] ?? '');
-   $statusFilter = trim($_GET['status'] ?? ''); 
+   $statusFilter = trim($_GET['status'] ?? '');
+   $courseFilter = trim($_GET['course'] ?? ''); 
  
    $params = [];
    $where = [];
-   $where[] = '(c.reported_by_staff_id = ? OR c.reported_by_staff_id = ?)';
-   $params[] = $currentStaffId;
-   $params[] = $currentUserId;
+   // Check if the current user is a marshal
+   $isMarshal = false;
+   try {
+       $marshalStmt = $pdo->prepare('SELECT id FROM marshal WHERE user_id = ? LIMIT 1');
+       $marshalStmt->execute([$currentUserId]);
+       $marshal = $marshalStmt->fetch(PDO::FETCH_ASSOC);
+       if ($marshal && !empty($marshal['id'])) {
+           $isMarshal = true;
+           $currentMarshalId = (int)$marshal['id'];
+       }
+   } catch (Throwable $e) { /* ignore */ }
+
+   // If user is a marshal, show only their cases, otherwise show staff cases
+   if ($isMarshal) {
+       $where[] = 'c.reported_by_marshal_id = ?';
+       $params[] = $currentMarshalId;
+   } else {
+       $where[] = '(c.reported_by_staff_id = ? OR c.reported_by_staff_id = ?)';
+       $params[] = $currentStaffId;
+       $params[] = $currentUserId;
+   }
  
    if ($q !== '') {
      $where[] = '(c.case_number LIKE ? OR s.first_name LIKE ? OR s.last_name LIKE ? OR a.appeal_text LIKE ?)';
@@ -43,14 +62,40 @@
  
    $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
  
+   // Check if the current user is a marshal and get department courses
+   $isMarshal = false;
+   $departmentCourses = [];
+   try {
+       $marshalStmt = $pdo->prepare('SELECT id, department_id FROM marshal WHERE user_id = ? LIMIT 1');
+       $marshalStmt->execute([$currentUserId]);
+       $marshal = $marshalStmt->fetch(PDO::FETCH_ASSOC);
+       
+       if ($marshal && !empty($marshal['id'])) {
+           $isMarshal = true;
+           $currentMarshalId = (int)$marshal['id'];
+           $marshalDeptId = $marshal['department_id'];
+           
+           // Get courses for the marshal's department
+           $courseStmt = $pdo->prepare('SELECT id, course_name FROM courses WHERE department_id = ? ORDER BY course_name');
+           $courseStmt->execute([$marshalDeptId]);
+           $departmentCourses = $courseStmt->fetchAll(PDO::FETCH_ASSOC);
+       }
+   } catch (Throwable $e) { 
+       error_log('Marshal/course lookup error: ' . $e->getMessage());
+   }
+
    // Fetch appeals with joins for context
    $sql = "SELECT 
              a.id AS appeal_id,
              a.case_id,
              a.student_id,
+             s.first_name,
+             s.last_name,
+             s.student_number,
              a.appeal_text,
              a.attachment_evidence_id,
              a.status_id,
+             cs.name AS status_name,
              a.submitted_at,
              a.reviewed_by_user_id,
              a.decision_text,
@@ -58,16 +103,50 @@
              c.case_number,
              c.title AS case_title,
              vt.name AS violation_name,
-             s.first_name, s.last_name, s.student_number,
              ce.file_path AS attachment_path,
              ce.filename AS attachment_filename
            FROM appeals a
            JOIN cases c ON c.id = a.case_id
-           LEFT JOIN violation_types vt ON vt.id = c.violation_type_id
-           JOIN students s ON s.id = a.student_id
-           LEFT JOIN case_evidence ce ON ce.id = a.attachment_evidence_id
-           $whereSql
-           ORDER BY a.submitted_at DESC, a.id DESC";
+           JOIN students s ON a.student_id = s.id
+           LEFT JOIN courses co ON s.course_id = co.id
+           LEFT JOIN departments d ON co.department_id = d.id
+           LEFT JOIN violation_types vt ON c.violation_type_id = vt.id
+           LEFT JOIN case_evidence ce ON a.attachment_evidence_id = ce.id
+           LEFT JOIN case_status cs ON a.status_id = cs.id";
+
+   // Add where clause based on user role
+   if ($isMarshal && $marshalDeptId) {
+       $where = ["d.id = ?"];
+       $params = [$marshalDeptId];
+       
+       // Add course filter if selected
+       if ($courseFilter !== '' && is_numeric($courseFilter)) {
+           $where[] = "s.course_id = ?";
+           $params[] = (int)$courseFilter;
+       }
+   } else {
+       $where = ["(c.reported_by_staff_id = ? OR c.reported_by_staff_id = ?)"];
+       $params = [$currentStaffId, $currentUserId];
+   }
+   
+   // Add the WHERE conditions
+   if (!empty($where)) {
+       $sql .= " WHERE " . implode(' AND ', $where);
+   }
+
+   // Add search filters if any
+   if ($q !== '') {
+       $sql .= " AND (c.case_number LIKE ? OR s.first_name LIKE ? OR s.last_name LIKE ? OR a.appeal_text LIKE ?)";
+       $like = "%" . $q . "%";
+       array_push($params, $like, $like, $like, $like);
+   }
+   
+   if ($statusFilter !== '' && ctype_digit($statusFilter)) {
+       $sql .= " AND a.status_id = ?";
+       $params[] = (int)$statusFilter;
+   }
+
+   $sql .= " ORDER BY a.submitted_at DESC, a.id DESC";
  
    $appeals = [];
    try {
@@ -121,6 +200,19 @@
              <?php endforeach; ?>
            </select>
          </div>
+         <?php if ($isMarshal && !empty($departmentCourses)): ?>
+         <div>
+           <label class="block text-sm text-gray-600 mb-1">Course</label>
+           <select name="course" class="w-full border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+             <option value="">All Courses</option>
+             <?php foreach ($departmentCourses as $course): ?>
+               <option value="<?php echo (int)$course['id']; ?>" <?php echo ($courseFilter !== '' && (int)$courseFilter === (int)$course['id']) ? 'selected' : ''; ?>>
+                 <?php echo e($course['course_name']); ?>
+               </option>
+             <?php endforeach; ?>
+           </select>
+         </div>
+         <?php endif; ?>
          <div class="flex items-end">
            <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
              <i class="fa-solid fa-magnifying-glass"></i>

@@ -47,7 +47,7 @@
       <li>
         <a href="manage-teachers.php" class="flex items-center gap-3 px-4 py-3 <?php echo isActive('manage-teachers.php', $current); ?>">
           <i class="fa-solid fa-chalkboard-user w-5"></i>
-          <span class="font-medium">Manage Teachers</span>
+          <span class="font-medium">Manage Marshals</span>
         </a>
       </li>
       <li>
